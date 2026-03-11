@@ -54,15 +54,15 @@ const ROUTE_TEMPLATES = {
     // Each waypoint makes consistent forward progress — no backtracking
     coreWaypoints: [
       [37.8005,-122.4365],  // Chestnut & Fillmore (west first on flat streets)
-      [37.8040,-122.4400],  // Marina Blvd west of Fillmore
-      [37.8040,-122.4490],  // Marina Blvd at Yacht Rd (stay on blvd, skip harbor)
-      [37.8040,-122.4580],  // Crissy Field west
-      [37.7985,-122.4620],  // Presidio / Mason St
-      [37.7930,-122.4700],  // Presidio interior
+      [37.8062,-122.4420],  // Marina Blvd between Fillmore & Scott (on the blvd)
+      [37.8065,-122.4510],  // Marina Blvd near Baker St (north of Palace of Fine Arts)
+      [37.8015,-122.4570],  // Mason St (south of Crissy Marsh, on main road)
+      [37.7985,-122.4620],  // Lincoln Blvd & Halleck
+      [37.7945,-122.4710],  // Lincoln Blvd (on main road, not Presidio interior)
       [37.7880,-122.4830],  // Baker Beach area
       [37.7830,-122.4840],  // Sea Cliff / 25th Ave
       [37.7740,-122.4770],  // GG Park north edge near 25th
-      [37.7710,-122.4680],  // JFK Dr mid-park
+      [37.7725,-122.4680],  // JFK Dr mid-park (north of Music Concourse)
       [37.7700,-122.4530],  // GG Park at Stanyan
       [37.7720,-122.4440],  // Panhandle
       [37.7750,-122.4370],  // Fell & Divisadero
@@ -79,9 +79,9 @@ const ROUTE_TEMPLATES = {
     // Out-and-back: northwest to Marina → west along Crissy → across GGB → Marin → Sausalito
     coreWaypoints: [
       [37.8005,-122.4365],  // Chestnut & Fillmore (west first on flat streets)
-      [37.8040,-122.4400],  // Marina Blvd west of Fillmore
-      [37.8040,-122.4490],  // Marina Blvd at Yacht Rd (stay on blvd, skip harbor)
-      [37.8040,-122.4580],  // Crissy Field west
+      [37.8062,-122.4420],  // Marina Blvd between Fillmore & Scott
+      [37.8065,-122.4510],  // Marina Blvd near Baker St (north of Palace of Fine Arts)
+      [37.8015,-122.4570],  // Mason St (south of Crissy Marsh, on main road)
       [37.8063,-122.4680],  // GGB approach
       [37.8083,-122.4745],  // GGB toll plaza
       [37.8183,-122.4785],  // GGB north end / Vista Point
