@@ -246,7 +246,7 @@ function RouteMap({ route }) {
       )}
       <iframe
         srcDoc={html}
-        style={{ width: "100%", height: 400, border: "none", display: "block" }}
+        style={{ width: "100%", height: "clamp(280px, 52vh, 400px)", border: "none", display: "block" }}
         title="Route map"
         sandbox="allow-scripts"
       />
@@ -375,11 +375,46 @@ ${trkpts}
         .fade-in{animation:fi 0.32s ease forwards}@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
         .slide-up{animation:su 0.42s cubic-bezier(.16,1,.3,1) forwards}@keyframes su{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         .blink{animation:bl 1.3s infinite}@keyframes bl{0%,100%{opacity:1}50%{opacity:0.3}}
+        .rp-header-inner{max-width:760px;margin:0 auto;padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+        .rp-main{max-width:760px;margin:0 auto;padding:40px 24px 100px}
+        .rp-hero{margin-bottom:44px}
+        .rp-form-grid{display:grid;gap:30px}
+        .rp-inline-row{display:flex;gap:8px}
+        .rp-distance-row{display:flex;align-items:center;gap:14px}
+        .rp-elevation-labels{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:7px}
+        .rp-elevation-label{font-size:12px;color:#ccc;text-align:center;transition:all 0.15s}
+        .rp-elevation-label.active{font-weight:600;color:#111}
+        .rp-elevation-label:first-child{text-align:left}
+        .rp-elevation-label:last-child{text-align:right}
+        .rp-toggle-group{display:flex;gap:8px}
+        .rp-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:24px}
+        .rp-tabs{display:flex;border-bottom:1px solid #ebebeb;margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+        .rp-tabs::-webkit-scrollbar{display:none}
+        .rp-export-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+        @media (max-width: 720px){
+          .rp-main{padding:28px 18px 72px}
+          .rp-hero{margin-bottom:32px}
+          .rp-inline-row,.rp-distance-row{flex-direction:column;align-items:stretch}
+          .rp-toggle-group{display:grid;grid-template-columns:1fr 1fr}
+          .rp-toggle-group > button,.rp-export-row > button{width:100%;justify-content:center}
+          .rp-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .rp-tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}
+          .rp-export-row{flex-direction:column;align-items:stretch}
+        }
+        @media (max-width: 520px){
+          .rp-header-inner{padding:0 16px;height:58px}
+          .rp-main{padding:24px 16px 56px}
+          .rp-hero h1{font-size:26px;line-height:1.12}
+          .rp-hero p{font-size:14px;line-height:1.55}
+          .rp-elevation-labels{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .rp-elevation-label{text-align:left}
+          .rp-elevation-label:last-child{text-align:left}
+        }
       `}</style>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header style={{ borderBottom: "1px solid #ebebeb", background: "rgba(250,250,248,0.94)", position: "sticky", top: 0, zIndex: 200, backdropFilter: "blur(10px)" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rp-header-inner">
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="9.5" stroke="#111" strokeWidth="1.5" />
@@ -399,21 +434,21 @@ ${trkpts}
       </header>
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
-      <main style={{ maxWidth: 760, margin: "0 auto", padding: "40px 24px 100px" }}>
+      <main className="rp-main">
 
         {/* ── Step 1: Input form ────────────────────────────────────────── */}
         {step === 1 && (
           <div className="fade-in">
-            <div style={{ marginBottom: 44 }}>
+            <div className="rp-hero">
               <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.7px", lineHeight: 1.18, marginBottom: 10 }}>Plan your ride.</h1>
-              <p style={{ color: "#888", fontSize: 14.5, lineHeight: 1.65 }}>Tell us where you're starting and what you want —<br />we'll build the route.</p>
+              <p style={{ color: "#888", fontSize: 14.5, lineHeight: 1.65 }}>Tell us where you're starting and what you want. We'll build the route.</p>
             </div>
 
-            <div style={{ display: "grid", gap: 30 }}>
+            <div className="rp-form-grid">
               {/* Starting point */}
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", display: "block", marginBottom: 10 }}>Starting point</label>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="rp-inline-row">
                   <input type="text" placeholder="Address or neighborhood in SF / Marin"
                     value={startAddress} onChange={e => { setStartAddress(e.target.value); setUseGPS(false); }}
                     style={{ flex: 1, border: "1.5px solid", borderColor: startAddress ? "#111" : "#e5e5e5", borderRadius: 10, padding: "13px 16px", fontSize: 14, background: "#fff", outline: "none", transition: "border-color 0.15s", fontFamily: "inherit" }}
@@ -430,7 +465,7 @@ ${trkpts}
               {/* Distance */}
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", display: "block", marginBottom: 10 }}>Distance</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div className="rp-distance-row">
                   <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                     <input type="number" value={distance} min={4} max={60}
                       onChange={e => setDistance(Math.min(60, Math.max(4, Number(e.target.value))))}
@@ -452,23 +487,10 @@ ${trkpts}
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", display: "block", marginBottom: 10 }}>Elevation preference</label>
                 <input type="range" min={0} max={4} value={elevSlider} onChange={e => setElevSlider(Number(e.target.value))} style={{ width: "100%" }} />
-                <div style={{ position: "relative", height: 20, marginTop: 7 }}>
+                <div className="rp-elevation-labels">
                   {ELEVATION_PRESETS.map((p, i) => {
-                    const pct = i / (ELEVATION_PRESETS.length - 1);
-                    const isFirst = i === 0;
-                    const isLast = i === ELEVATION_PRESETS.length - 1;
                     return (
-                      <span key={p.label} style={{
-                        position: "absolute",
-                        left: isLast ? "auto" : `${pct * 100}%`,
-                        right: isLast ? 0 : "auto",
-                        transform: isFirst ? "none" : isLast ? "none" : "translateX(-50%)",
-                        fontSize: 12,
-                        fontWeight: elevSlider === i ? 600 : 400,
-                        color: elevSlider === i ? "#111" : "#ccc",
-                        transition: "all 0.15s",
-                        whiteSpace: "nowrap",
-                      }}>{p.label}</span>
+                      <span key={p.label} className={`rp-elevation-label ${elevSlider === i ? "active" : ""}`}>{p.label}</span>
                     );
                   })}
                 </div>
@@ -481,7 +503,7 @@ ${trkpts}
               {/* Route type */}
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", display: "block", marginBottom: 10 }}>Route type</label>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="rp-toggle-group">
                   {["Loop", "Out & back"].map(type => {
                     const active = (preferLoop && type === "Loop") || (!preferLoop && type === "Out & back");
                     return (
@@ -541,7 +563,7 @@ ${trkpts}
             </div>
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 24 }}>
+            <div className="rp-stats-grid">
               {[
                 { label: "Distance", value: route.distance, unit: "mi" },
                 { label: "Elevation", value: route.elevationGain, unit: "ft" },
@@ -569,7 +591,7 @@ ${trkpts}
             </div>
 
             {/* Tabs */}
-            <div style={{ display: "flex", borderBottom: "1px solid #ebebeb", marginBottom: 20 }}>
+            <div className="rp-tabs">
               {["overview", "elevation", "scenic"].map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   style={{ padding: "9px 17px", fontSize: 13, fontWeight: 500, background: "none", border: "none", borderBottom: `2px solid ${activeTab === tab ? "#111" : "transparent"}`, color: activeTab === tab ? "#111" : "#aaa", cursor: "pointer", marginBottom: -1, transition: "all 0.15s", fontFamily: "inherit", textTransform: "capitalize" }}>
@@ -620,7 +642,7 @@ ${trkpts}
                   ✓ {exportSuccess === "strava" ? "Route saved to your Strava account." : "GPX downloaded — import in Strava or Garmin Connect."}
                 </div>
               )}
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="rp-export-row">
                 {!stravaConnected ? (
                   <button onClick={handleStravaConnect}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 18px", borderRadius: 10, border: "1.5px solid #FC4C02", background: "#fff", color: "#FC4C02", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
