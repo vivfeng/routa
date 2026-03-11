@@ -1,16 +1,37 @@
-# React + Vite
+# Routa — SF / Marin Ride Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Bike route planner for San Francisco and Marin County. Enter a starting neighborhood, set your distance and elevation preferences, and get a curated cycling route with an interactive map, elevation profile, and GPX export.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Route generation** — 3 curated templates: Golden Gate Loop, Golden Gate to Sausalito, Ocean Beach & Sunset
+- **Interactive map** — Leaflet with OpenStreetMap tiles, start/end markers, route overlay
+- **Elevation profiles** — SVG elevation chart with color-coded difficulty ratings
+- **Flexible inputs** — Distance (4–60 mi), elevation preference (flat to very hilly), loop or out-and-back
+- **GPX export** — Download routes for Strava, Garmin Connect, Wahoo, or any GPX-compatible device
+- **Strava integration** — OAuth connect flow (bring your own client ID)
+- **SF neighborhood geocoding** — Recognizes Russian Hill, Marina, Mission, Castro, Presidio, Sausalito, and more
 
-## React Compiler
+## Getting started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+Open http://localhost:5173
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Tech
+
+- React 19 + Vite
+- Leaflet (loaded via iframe srcdoc — zero CORS issues)
+- OpenStreetMap / Public Domain Map tiles
+- No backend required — runs entirely client-side
+
+## Roadmap
+
+- [ ] Real routing via OpenRouteService cycling profile
+- [ ] Live geocoding (Mapbox / Google)
+- [ ] Coffee stop waypoints (Google Places API)
+- [ ] Strava OAuth with real credentials
+- [ ] Mobile-optimized layout
