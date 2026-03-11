@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const ELEVATION_PRESETS = [
   { label: "Mostly Flat", ftPerMile: 25 },
@@ -39,22 +39,35 @@ function geocode(addr) {
 }
 
 // ── Route templates ───────────────────────────────────────────────────────────
+// Waypoints are dense enough to guide OSRM without U-turns.
+// All loops flow in one direction (clockwise). Routes stay north/west of
+// Tenderloin (lat < 37.787, lng > -122.420) and Civic Center.
 const ROUTE_TEMPLATES = {
   scenic: {
     name: "Golden Gate Loop",
     distance: 16.2, elevationGain: 680, ftPerMile: 42, time: 88,
     scenicZones: ["Crissy Field", "Presidio", "Baker Beach", "Golden Gate Park"],
     isScenic: true, hasGGBCrossing: false,
-    description: "Crissy Field path → Presidio → Baker Beach → Golden Gate Park loop.",
-    canonicalStart: [37.7996, -122.4183],
-    waypoints: [
-      [37.7996,-122.4183],[37.8030,-122.4100],[37.8063,-122.4241],
-      [37.8073,-122.4390],[37.8058,-122.4465],[37.8044,-122.4526],
-      [37.8031,-122.4600],[37.8006,-122.4651],[37.7995,-122.4700],
-      [37.7970,-122.4748],[37.7952,-122.4789],[37.7935,-122.4830],
-      [37.7833,-122.4837],[37.7694,-122.4862],[37.7694,-122.4700],
-      [37.7694,-122.4550],[37.7694,-122.4400],[37.7726,-122.4364],
-      [37.7800,-122.4183],[37.7996,-122.4183],
+    description: "Crissy Field → Presidio → Baker Beach → Golden Gate Park → Panhandle → Pacific Heights loop.",
+    // Clockwise: northwest to Marina → west along Crissy → Presidio → Baker Beach
+    //   → south to GG Park → east through park → north via Divisadero/Pac Heights → home
+    // Each waypoint makes consistent forward progress — no backtracking
+    coreWaypoints: [
+      [37.8005,-122.4365],  // Chestnut & Fillmore (west first on flat streets)
+      [37.8040,-122.4400],  // Marina Blvd west of Fillmore
+      [37.8040,-122.4490],  // Marina Blvd at Yacht Rd (stay on blvd, skip harbor)
+      [37.8040,-122.4580],  // Crissy Field west
+      [37.7985,-122.4620],  // Presidio / Mason St
+      [37.7930,-122.4700],  // Presidio interior
+      [37.7880,-122.4830],  // Baker Beach area
+      [37.7830,-122.4840],  // Sea Cliff / 25th Ave
+      [37.7740,-122.4770],  // GG Park north edge near 25th
+      [37.7710,-122.4680],  // JFK Dr mid-park
+      [37.7700,-122.4530],  // GG Park at Stanyan
+      [37.7720,-122.4440],  // Panhandle
+      [37.7750,-122.4370],  // Fell & Divisadero
+      [37.7850,-122.4350],  // Divisadero & Clay (north of Tenderloin)
+      [37.7920,-122.4340],  // Pacific Heights / Fillmore
     ]
   },
   marin: {
@@ -63,47 +76,115 @@ const ROUTE_TEMPLATES = {
     scenicZones: ["Crissy Field", "Marin Headlands", "Sausalito Waterfront"],
     isScenic: true, hasGGBCrossing: true,
     description: "Cross the Golden Gate Bridge, Marin Headlands, descend into Sausalito.",
-    canonicalStart: [37.7996, -122.4183],
-    waypoints: [
-      [37.7996,-122.4183],[37.8030,-122.4100],[37.8063,-122.4241],
-      [37.8073,-122.4390],[37.8044,-122.4526],[37.8063,-122.4680],
-      [37.8083,-122.4745],[37.8140,-122.4782],[37.8183,-122.4785],
-      [37.8225,-122.4784],[37.8316,-122.4780],[37.8340,-122.4850],
-      [37.8348,-122.4934],[37.8324,-122.4994],[37.8421,-122.4972],
-      [37.8490,-122.4916],[37.8567,-122.4852],[37.8590,-122.4830],
+    // Out-and-back: northwest to Marina → west along Crissy → across GGB → Marin → Sausalito
+    coreWaypoints: [
+      [37.8005,-122.4365],  // Chestnut & Fillmore (west first on flat streets)
+      [37.8040,-122.4400],  // Marina Blvd west of Fillmore
+      [37.8040,-122.4490],  // Marina Blvd at Yacht Rd (stay on blvd, skip harbor)
+      [37.8040,-122.4580],  // Crissy Field west
+      [37.8063,-122.4680],  // GGB approach
+      [37.8083,-122.4745],  // GGB toll plaza
+      [37.8183,-122.4785],  // GGB north end / Vista Point
+      [37.8316,-122.4780],  // Conzelman Rd
+      [37.8340,-122.4850],  // Hawk Hill
+      [37.8348,-122.4934],  // Marin Headlands descent
+      [37.8421,-122.4972],  // Alexander Ave
+      [37.8490,-122.4916],  // Sausalito approach
+      [37.8590,-122.4830],  // Sausalito waterfront
     ]
   },
   ocean: {
     name: "Ocean Beach & Sunset",
     distance: 12.8, elevationGain: 320, ftPerMile: 25, time: 72,
-    scenicZones: ["Ocean Beach", "Golden Gate Park"],
+    scenicZones: ["Ocean Beach", "Golden Gate Park", "Sunset District"],
     isScenic: true, hasGGBCrossing: false,
-    description: "Panhandle → Golden Gate Park → Great Highway along Ocean Beach loop.",
-    canonicalStart: [37.7996, -122.4183],
-    waypoints: [
-      [37.7996,-122.4183],[37.7900,-122.4183],[37.7783,-122.4183],
-      [37.7715,-122.4430],[37.7722,-122.4530],[37.7694,-122.4590],
-      [37.7694,-122.4862],[37.7700,-122.5070],[37.7650,-122.5107],
-      [37.7575,-122.5107],[37.7510,-122.5100],[37.7430,-122.5090],
-      [37.7350,-122.5082],[37.7450,-122.5095],[37.7550,-122.5103],
-      [37.7609,-122.4945],[37.7640,-122.4694],[37.7750,-122.4400],
-      [37.7900,-122.4183],[37.7996,-122.4183],
+    description: "Pacific Heights → GG Park → Ocean Beach → Sunset loop back via Panhandle.",
+    // Clockwise: west through Pac Heights → south into GG Park → west to Ocean Beach
+    //   → south along Great Highway → east on Sloat → north on Sunset Blvd
+    //   → east through GG Park / Panhandle → north via Divisadero → home
+    coreWaypoints: [
+      [37.7920,-122.4380],  // Pacific Heights heading west
+      [37.7830,-122.4500],  // Arguello & California
+      [37.7750,-122.4580],  // Arguello & Fulton (GG Park entrance)
+      [37.7710,-122.4680],  // JFK Dr inside park
+      [37.7700,-122.4800],  // GG Park mid
+      [37.7700,-122.4950],  // GG Park west
+      [37.7700,-122.5100],  // Ocean Beach / Great Highway north
+      [37.7600,-122.5095],  // Great Highway south
+      [37.7500,-122.5080],  // Great Highway further south
+      [37.7380,-122.5060],  // Sloat & Great Highway
+      [37.7380,-122.4960],  // Sloat Blvd heading east
+      [37.7430,-122.4870],  // Sunset Blvd & Sloat (turn north)
+      [37.7530,-122.4770],  // Sunset Blvd & Noriega
+      [37.7620,-122.4690],  // Sunset Blvd & Irving
+      [37.7700,-122.4530],  // Stanyan & Haight (park east end)
+      [37.7720,-122.4440],  // Panhandle heading east
+      [37.7750,-122.4370],  // Fell & Divisadero
+      [37.7850,-122.4350],  // Divisadero & Clay (north of Tenderloin)
+      [37.7920,-122.4340],  // Pacific Heights / Fillmore
     ]
   }
 };
 
+// Build route: prepend user start, append user end for loops
 function buildRoute(template, userLatLng) {
-  const [uLat, uLng] = userLatLng;
-  const [cLat, cLng] = template.canonicalStart;
-  const dLat = uLat - cLat, dLng = uLng - cLng;
-  return { ...template, waypoints: template.waypoints.map(([la, ln]) => [la + dLat, ln + dLng]) };
+  const core = template.coreWaypoints;
+  const isLoop = template.name !== "Golden Gate to Sausalito";
+  const waypoints = isLoop
+    ? [userLatLng, ...core, userLatLng]
+    : [userLatLng, ...core];
+  return { ...template, waypoints };
 }
 
-// ── Map component — Leaflet in an iframe srcdoc (no CORS issues) ─────────────
-// Tile layer uses OpenStreetMap data (publicdomainmap.org sources from OSM US)
+// ── Fetch road-snapped route from OSRM (runs in React, not iframe) ───────────
+function useRouteGeometry(waypoints) {
+  const [coords, setCoords] = useState(null);
+  const waypointsKey = JSON.stringify(waypoints);
+
+  useEffect(() => {
+    let cancelled = false;
+    const osrmCoords = waypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
+    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
+    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
+
+    function parse(data) {
+      if (data.code === 'Ok' && data.routes && data.routes[0]) {
+        return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      }
+      return null;
+    }
+
+    fetch(bikeUrl)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        const result = parse(data);
+        if (result) { setCoords(result); return; }
+        return fetch(carUrl).then(r => r.json()).then(data2 => {
+          if (!cancelled) setCoords(parse(data2) || waypoints);
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        fetch(carUrl).then(r => r.json()).then(data => {
+          if (!cancelled) setCoords(parse(data) || waypoints);
+        }).catch(() => { if (!cancelled) setCoords(waypoints); });
+      });
+
+    return () => { cancelled = true; };
+  }, [waypointsKey]);
+
+  return coords;
+}
+
+// ── Map component — Leaflet in iframe srcdoc, coords resolved by React ───────
 function RouteMap({ route }) {
-  const waypointsJson = JSON.stringify(route.waypoints);
-  const isLoop = Math.abs(route.waypoints[0][0] - route.waypoints[route.waypoints.length-1][0]) < 0.001;
+  const resolvedCoords = useRouteGeometry(route.waypoints);
+  const displayCoords = resolvedCoords || route.waypoints;
+  const coordsJson = JSON.stringify(displayCoords);
+  const last = route.waypoints[route.waypoints.length-1];
+  const isLoop = Math.abs(route.waypoints[0][0] - last[0]) < 0.001 && Math.abs(route.waypoints[0][1] - last[1]) < 0.001;
+  const loading = !resolvedCoords;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -120,35 +201,33 @@ function RouteMap({ route }) {
 <div id="map"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>
 <script>
-  var waypoints = ${waypointsJson};
+  var coords = ${coordsJson};
   var isLoop = ${isLoop};
   var map = L.map('map', { zoomControl: true, scrollWheelZoom: true });
 
-  // OpenStreetMap tiles — publicdomainmap.org contributes to this dataset
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://publicdomainmap.org">Public Domain Map</a>',
     maxZoom: 19
   }).addTo(map);
 
   // Route glow
-  L.polyline(waypoints, { color: '#f97316', weight: 12, opacity: 0.12, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  L.polyline(coords, { color: '#f97316', weight: 12, opacity: 0.12, lineCap: 'round', lineJoin: 'round' }).addTo(map);
   // Route line
-  var line = L.polyline(waypoints, { color: '#f97316', weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  var line = L.polyline(coords, { color: '#f97316', weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
 
   // Start marker
   var startIcon = L.divIcon({
     html: '<div style="font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center"><div style="background:#111;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25)">' + (isLoop ? 'Start / End' : 'Start') + '</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #111;margin-top:-1px"></div><div style="width:5px;height:5px;background:#111;border-radius:50%;border:2px solid #fff;margin-top:-1px;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div></div>',
     className: '', iconSize: [80, 40], iconAnchor: [isLoop ? 37 : 24, 40]
   });
-  L.marker(waypoints[0], { icon: startIcon }).addTo(map);
+  L.marker(coords[0], { icon: startIcon }).addTo(map);
 
-  // End marker (non-loop only)
   if (!isLoop) {
     var endIcon = L.divIcon({
       html: '<div style="font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center"><div style="background:#f97316;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 8px rgba(249,115,22,0.3)">End</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #f97316;margin-top:-1px"></div><div style="width:5px;height:5px;background:#f97316;border-radius:50%;border:2px solid #fff;margin-top:-1px"></div></div>',
       className: '', iconSize: [50, 40], iconAnchor: [18, 40]
     });
-    L.marker(waypoints[waypoints.length-1], { icon: endIcon }).addTo(map);
+    L.marker(coords[coords.length-1], { icon: endIcon }).addTo(map);
   }
 
   map.fitBounds(line.getBounds(), { padding: [32, 32] });
@@ -157,12 +236,21 @@ function RouteMap({ route }) {
 </html>`;
 
   return (
-    <iframe
-      srcDoc={html}
-      style={{ width: "100%", height: 400, border: "none", display: "block" }}
-      title="Route map"
-      sandbox="allow-scripts allow-same-origin"
-    />
+    <div style={{ position: "relative" }}>
+      {loading && (
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 10,
+          fontFamily: "system-ui,sans-serif", fontSize: 13, color: "#888", background: "#fff",
+          padding: "8px 16px", borderRadius: 8, boxShadow: "0 2px 12px rgba(0,0,0,0.1)" }}>
+          Loading route…
+        </div>
+      )}
+      <iframe
+        srcDoc={html}
+        style={{ width: "100%", height: 400, border: "none", display: "block" }}
+        title="Route map"
+        sandbox="allow-scripts"
+      />
+    </div>
   );
 }
 
@@ -216,7 +304,9 @@ export default function RidePlanner() {
     setGenerating(true);
     setTimeout(() => {
       const latlng = useGPS ? [37.7996, -122.4183] : geocode(startAddress);
-      const templateKey = elevSlider <= 1 ? "ocean" : distance >= 20 ? "marin" : "scenic";
+      const templateKey = preferLoop
+        ? (elevSlider <= 1 ? "ocean" : "scenic")
+        : (distance >= 20 ? "marin" : elevSlider <= 1 ? "ocean" : "scenic");
       const built = buildRoute(ROUTE_TEMPLATES[templateKey], latlng);
       setStartLatLng(latlng);
       setRoute(built);
