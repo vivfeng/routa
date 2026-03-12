@@ -14,7 +14,6 @@ const SF_MARIN_BBOX = [-122.55, 37.70, -122.34, 37.93];
 // ── Geocoder ──────────────────────────────────────────────────────────────────
 const SF_GEOCODES = {
   "russian hill": [37.7996, -122.4183],
-  "vallejo":      [37.7996, -122.4183],
   "marina":       [37.8030, -122.4360],
   "mission":      [37.7599, -122.4148],
   "castro":       [37.7625, -122.4350],
@@ -29,12 +28,8 @@ const SF_GEOCODES = {
   "sunset":       [37.7528, -122.4833],
   "embarcadero":  [37.7955, -122.3937],
   "ferry building": [37.7955, -122.3937],
-  "mallorca way": [37.8004, -122.4388],
   "presidio":     [37.7989, -122.4662],
-  "graham st":    [37.8005, -122.4567],
-  "graham street": [37.8005, -122.4567],
   "sausalito":    [37.8590, -122.4852],
-  "default":      [37.7996, -122.4183],
 };
 
 function parseLatLng(addr) {
@@ -52,22 +47,329 @@ function normalizeAddressInput(addr) {
     .trim();
 }
 
-function buildAddressSearchVariants(addr) {
-  const normalized = normalizeAddressInput(addr);
-  const streetLine = normalized.split(",")[0]?.trim() || normalized;
-  const zip = normalized.match(/\b\d{5}\b/)?.[0];
+function buildAddressKey(addr) {
+  return normalizeAddressInput(addr)
+    .toLowerCase()
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  return [...new Set([
-    normalized,
-    normalized.replace(/,?\s*United States$/i, "").trim(),
-    normalized.replace(/,?\s*San Francisco,\s*CA\s*\d{5}$/i, "").trim(),
-    streetLine,
-    [streetLine, zip].filter(Boolean).join(" "),
-  ].filter(Boolean))];
+function isConfirmedAddressInput(addr, confirmedAddress) {
+  if (!confirmedAddress) return false;
+  return buildAddressKey(addr) === confirmedAddress.addressKey;
 }
 
 function looksLikeStreetAddress(addr) {
   return /\b\d+\b/.test(addr);
+}
+
+function parseBusinessQuery(addr) {
+  const normalized = normalizeAddressInput(addr);
+  const inMatch = normalized.match(/^(.+?)\s+in\s+(.+)$/i);
+  if (inMatch) {
+    return {
+      primaryQuery: inMatch[1].trim(),
+      fallbackQuery: normalized,
+      areaHint: inMatch[2].trim(),
+    };
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return {
+      primaryQuery: words.slice(0, -1).join(" "),
+      fallbackQuery: normalized,
+      areaHint: words.slice(-1).join(" "),
+      alternateAreaHint: words.length >= 3 ? words.slice(-2).join(" ") : "",
+      alternateQuery: words.length >= 3 ? words.slice(0, -2).join(" ") : "",
+    };
+  }
+
+  return {
+    primaryQuery: normalized,
+    fallbackQuery: normalized,
+    areaHint: "",
+    alternateAreaHint: "",
+    alternateQuery: "",
+  };
+}
+
+function normalizeStreetName(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\bstreet\b/g, "st")
+    .replace(/\bavenue\b/g, "ave")
+    .replace(/\bboulevard\b/g, "blvd")
+    .replace(/\broad\b/g, "rd")
+    .replace(/\bdrive\b/g, "dr")
+    .replace(/\bplace\b/g, "pl")
+    .replace(/\bterrace\b/g, "ter")
+    .replace(/\blane\b/g, "ln")
+    .replace(/[.,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toTitleCase(value) {
+  return String(value || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function parseStreetAddress(addr) {
+  const normalized = normalizeAddressInput(addr);
+  const streetLine = normalized.split(",")[0]?.trim() || normalized;
+  const match = streetLine.match(/^(\d+[A-Za-z]?)\s+(.+)$/);
+  if (!match) return null;
+
+  return {
+    houseNumberText: match[1],
+    houseNumber: Number.parseInt(match[1], 10),
+    streetName: match[2].trim(),
+    normalizedStreetName: normalizeStreetName(match[2]),
+  };
+}
+
+function parseCandidateStreetAddress(label) {
+  return parseStreetAddress(label);
+}
+
+function averageLatLng(candidates) {
+  const total = candidates.reduce(
+    (acc, candidate) => {
+      acc.lat += candidate.lat;
+      acc.lng += candidate.lng;
+      return acc;
+    },
+    { lat: 0, lng: 0 },
+  );
+
+  return {
+    lat: total.lat / candidates.length,
+    lng: total.lng / candidates.length,
+  };
+}
+
+function dedupeCandidatesByLabel(candidates) {
+  return [...new Map(candidates.map((candidate) => [candidate.label, candidate])).values()];
+}
+
+function buildNearbyAddressCandidates(requestedAddress, candidates) {
+  const parsedRequested = parseStreetAddress(requestedAddress);
+  if (!parsedRequested) return [];
+
+  const sameStreetCandidates = dedupeCandidatesByLabel(
+    candidates
+      .map((candidate) => {
+        const parsedCandidate = parseCandidateStreetAddress(candidate.label);
+        if (!parsedCandidate) return null;
+        if (parsedCandidate.normalizedStreetName !== parsedRequested.normalizedStreetName) return null;
+        if (!Number.isFinite(parsedCandidate.houseNumber)) return null;
+
+        return {
+          ...candidate,
+          houseNumber: parsedCandidate.houseNumber,
+          houseNumberText: parsedCandidate.houseNumberText,
+          distanceFromRequested: Math.abs(parsedCandidate.houseNumber - parsedRequested.houseNumber),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.distanceFromRequested - b.distanceFromRequested)
+  );
+
+  if (!sameStreetCandidates.length) return [];
+
+  const exactCandidates = sameStreetCandidates.filter(
+    (candidate) => candidate.houseNumber === parsedRequested.houseNumber,
+  );
+  if (exactCandidates.length) {
+    return exactCandidates.map((candidate) => ({
+      ...candidate,
+      matchType: "exact",
+      helperText: "Exact address match",
+    }));
+  }
+
+  const nearbyCandidates = sameStreetCandidates.slice(0, 3).map((candidate) => ({
+    ...candidate,
+    matchType: "nearby",
+    helperText: `Nearby real address on ${parsedRequested.streetName}`,
+  }));
+
+  const midpointAnchors = nearbyCandidates.slice(0, 2);
+  if (midpointAnchors.length >= 2) {
+    const midpoint = averageLatLng(midpointAnchors);
+    nearbyCandidates.push({
+      ...midpoint,
+      label: `Approximate midpoint on ${parsedRequested.streetName} near ${midpointAnchors[0].houseNumberText} and ${midpointAnchors[1].houseNumberText} ${parsedRequested.streetName}`,
+      matchType: "block-midpoint",
+      helperText: "Approximate block midpoint between nearby real addresses",
+      anchorHouseNumbers: [midpointAnchors[0].houseNumberText, midpointAnchors[1].houseNumberText],
+      isApproximate: true,
+    });
+  }
+
+  return nearbyCandidates;
+}
+
+function hasApproximateRecoveryCandidates(candidates) {
+  return candidates.some((candidate) => candidate.matchType === "nearby" || candidate.matchType === "block-midpoint");
+}
+
+function extractMapboxFeatureName(feature) {
+  return (
+    feature?.properties?.name_preferred ||
+    feature?.properties?.name ||
+    feature?.properties?.full_address ||
+    feature?.place_name ||
+    ""
+  );
+}
+
+function extractMapboxNeighborhood(feature) {
+  const context = feature?.properties?.context || {};
+  return context.neighborhood?.name || context.locality?.name || context.district?.name || "";
+}
+
+function extractMapboxPlace(feature) {
+  const context = feature?.properties?.context || {};
+  return context.place?.name || context.locality?.name || "";
+}
+
+function formatStreetAddress(addressNumber, streetName) {
+  if (!addressNumber && !streetName) return "";
+  if (!addressNumber) return toTitleCase(streetName);
+  return `${addressNumber} ${toTitleCase(streetName)}`;
+}
+
+function formatSearchBoxLabel(feature) {
+  const properties = feature?.properties || {};
+  const featureType = properties.feature_type;
+  const name = properties.name_preferred || properties.name || properties.full_address || "";
+  const neighborhood = extractMapboxNeighborhood(feature);
+  const place = extractMapboxPlace(feature);
+  const addressContext = properties.context?.address || {};
+  const streetAddress = formatStreetAddress(addressContext.address_number, addressContext.street_name);
+
+  if (featureType === "poi") {
+    if (streetAddress && neighborhood) {
+      return `${name} · ${streetAddress} · ${neighborhood}`;
+    }
+    if (streetAddress && place) {
+      return `${name} · ${streetAddress} · ${place}`;
+    }
+    if (neighborhood && place) {
+      return `${name} · ${neighborhood} · ${place}`;
+    }
+    return `${name} · ${properties.place_formatted || place || neighborhood}`;
+  }
+
+  return (
+    properties.full_address ||
+    properties.name_preferred ||
+    properties.name ||
+    properties.place_formatted ||
+    name
+  );
+}
+
+function candidateSearchText(candidate) {
+  return [
+    candidate.label,
+    candidate.rawName,
+    candidate.neighborhood,
+    candidate.place,
+    candidate.fullAddress,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function scoreAreaHint(candidate, areaHint) {
+  if (!areaHint) return 0;
+  const normalizedHint = areaHint.toLowerCase();
+  const searchText = candidateSearchText(candidate);
+  return searchText.includes(normalizedHint) ? -5 : 0;
+}
+
+function scoreBusinessQuery(candidate, businessQuery) {
+  const normalizedQuery = businessQuery.toLowerCase();
+  const rawName = String(candidate.rawName || "").toLowerCase();
+  return rawName.includes(normalizedQuery) ? -2 : 0;
+}
+
+function scoreFeatureType(candidate) {
+  if (candidate.featureType === "poi") return -4;
+  if (candidate.featureType === "address") return -2;
+  if (candidate.featureType === "place" || candidate.featureType === "neighborhood" || candidate.featureType === "locality") return -1;
+  return 0;
+}
+
+function buildSearchBoxSessionToken() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `routa-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function reverseGeocodeMapboxMidpoint(lat, lng) {
+  if (!MAPBOX_ACCESS_TOKEN) return [];
+
+  const url = new URL("https://api.mapbox.com/search/geocode/v6/reverse");
+  url.searchParams.set("longitude", String(lng));
+  url.searchParams.set("latitude", String(lat));
+  url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+  url.searchParams.set("limit", "6");
+  url.searchParams.set("types", "address,street,neighborhood,locality,place");
+
+  const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Mapbox reverse search failed");
+
+  const data = await response.json();
+  return Array.isArray(data?.features) ? data.features : [];
+}
+
+async function enrichMidpointCandidate(candidate, requestedStreetName) {
+  if (candidate.matchType !== "block-midpoint") {
+    return candidate;
+  }
+
+  try {
+    const features = await reverseGeocodeMapboxMidpoint(candidate.lat, candidate.lng);
+    const normalizedRequestedStreet = normalizeStreetName(requestedStreetName);
+    const crossStreet = features
+      .map((feature) => extractMapboxFeatureName(feature))
+      .map((name) => name.split(",")[0]?.trim() || name)
+      .find((name) => name && normalizeStreetName(name) !== normalizedRequestedStreet);
+    const neighborhood = features
+      .map((feature) => extractMapboxNeighborhood(feature))
+      .find(Boolean);
+
+    const streetLabel = toTitleCase(requestedStreetName);
+    const anchorText = `near ${candidate.anchorHouseNumbers?.[0]} and ${candidate.anchorHouseNumbers?.[1]} ${streetLabel}`;
+    const locationText = crossStreet
+      ? `${streetLabel} & ${crossStreet}`
+      : `midpoint on ${streetLabel}`;
+    const neighborhoodText = neighborhood ? ` in ${neighborhood}` : "";
+
+    return {
+      ...candidate,
+      label: `Approximate midpoint at ${locationText}${neighborhoodText}, ${anchorText}`,
+      helperText: crossStreet
+        ? `Approximate block midpoint near ${crossStreet}`
+        : `Approximate block midpoint between nearby real addresses${neighborhoodText}`,
+    };
+  } catch {
+    return candidate;
+  }
+}
+
+async function enrichRecoveryCandidates(candidates, requestedStreetName) {
+  return Promise.all(candidates.map((candidate) => enrichMidpointCandidate(candidate, requestedStreetName)));
 }
 
 async function searchMapboxCandidates(addr) {
@@ -108,6 +410,105 @@ async function searchMapboxCandidates(addr) {
     });
 }
 
+async function retrieveSearchBoxFeature(mapboxId, sessionToken) {
+  const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${mapboxId}`);
+  url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+  url.searchParams.set("session_token", sessionToken);
+
+  const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error("Mapbox retrieve failed");
+
+  const data = await response.json();
+  return Array.isArray(data?.features) ? data.features[0] : null;
+}
+
+async function searchMapboxSearchBoxCandidates(addr) {
+  if (!MAPBOX_ACCESS_TOKEN) return [];
+
+  const {
+    primaryQuery,
+    fallbackQuery,
+    areaHint,
+    alternateAreaHint = "",
+    alternateQuery = "",
+  } = parseBusinessQuery(addr);
+  const queryPlans = [
+    { query: primaryQuery, areaHint },
+    { query: alternateQuery, areaHint: alternateAreaHint },
+    { query: fallbackQuery, areaHint: "" },
+  ].filter((plan) => plan.query);
+  const sessionToken = buildSearchBoxSessionToken();
+
+  const suggestionGroups = await Promise.all(
+    queryPlans.map(async (plan) => {
+      const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+      url.searchParams.set("q", plan.query);
+      url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+      url.searchParams.set("session_token", sessionToken);
+      url.searchParams.set("country", "US");
+      url.searchParams.set("limit", "5");
+      url.searchParams.set("bbox", SF_MARIN_BBOX.join(","));
+
+      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Mapbox Search Box suggest failed");
+
+      const data = await response.json();
+      return (Array.isArray(data?.suggestions) ? data.suggestions : []).map((suggestion) => ({
+        ...suggestion,
+        _areaHint: plan.areaHint,
+        _businessQuery: plan.query,
+      }));
+    }),
+  );
+
+  const suggestions = suggestionGroups
+    .flat()
+    .filter((suggestion) => ["poi", "address", "street", "neighborhood", "place", "locality"].includes(suggestion?.feature_type));
+
+  const uniqueSuggestions = [...new Map(suggestions.map((suggestion) => [suggestion.mapbox_id, suggestion])).values()].slice(0, 6);
+  const retrievedSuggestions = await Promise.all(
+    uniqueSuggestions.map(async (suggestion) => ({
+      suggestion,
+      feature: await retrieveSearchBoxFeature(suggestion.mapbox_id, sessionToken),
+    })),
+  );
+
+  return retrievedSuggestions
+    .filter(({ feature }) => Array.isArray(feature?.geometry?.coordinates))
+    .map(({ feature, suggestion }) => {
+      const [lng, lat] = feature.geometry.coordinates;
+      const properties = feature.properties || {};
+
+      return {
+        lat,
+        lng,
+        label: formatSearchBoxLabel(feature),
+        rawName: properties.name_preferred || properties.name || "",
+        fullAddress: properties.full_address || "",
+        neighborhood: extractMapboxNeighborhood(feature),
+        place: extractMapboxPlace(feature),
+        featureType: properties.feature_type || "",
+        areaHint: suggestion?._areaHint || "",
+        businessQuery: suggestion?._businessQuery || "",
+      };
+    })
+    .sort((a, b) => {
+      const scoreA = scoreFeatureType(a) + scoreAreaHint(a, a.areaHint) + scoreBusinessQuery(a, a.businessQuery);
+      const scoreB = scoreFeatureType(b) + scoreAreaHint(b, b.areaHint) + scoreBusinessQuery(b, b.businessQuery);
+      return scoreA - scoreB;
+    });
+}
+
+async function searchNearbyMapboxStreetCandidates(addr) {
+  if (!MAPBOX_ACCESS_TOKEN) return [];
+
+  const parsedRequested = parseStreetAddress(addr);
+  if (!parsedRequested?.streetName) return [];
+
+  const streetQuery = `${parsedRequested.streetName}, San Francisco, CA`;
+  return searchMapboxCandidates(streetQuery);
+}
+
 async function searchAddressCandidates(addr) {
   if (!addr) return [];
   const normalizedAddress = normalizeAddressInput(addr);
@@ -118,13 +519,49 @@ async function searchAddressCandidates(addr) {
     return [{ lat: parsedLatLng[0], lng: parsedLatLng[1], label: `${parsedLatLng[0]}, ${parsedLatLng[1]}` }];
   }
 
+  if (!exactAddressMode) {
+    try {
+      const searchBoxCandidates = await searchMapboxSearchBoxCandidates(normalizedAddress);
+      if (searchBoxCandidates.length) {
+        return searchBoxCandidates;
+      }
+    } catch {
+      // Fall through to geocoding/local shorthand.
+    }
+  }
+
   try {
     const mapboxCandidates = await searchMapboxCandidates(normalizedAddress);
     if (mapboxCandidates.length) {
-      return mapboxCandidates;
+      if (!exactAddressMode) {
+        return mapboxCandidates;
+      }
+
+      const recoveredCandidates = await enrichRecoveryCandidates(
+        buildNearbyAddressCandidates(normalizedAddress, mapboxCandidates),
+        parseStreetAddress(normalizedAddress)?.streetName || "",
+      );
+      if (recoveredCandidates.length) {
+        return recoveredCandidates;
+      }
     }
   } catch {
     // Fall back to local/API helpers if Mapbox is unavailable.
+  }
+
+  if (exactAddressMode) {
+    try {
+      const streetCandidates = await searchNearbyMapboxStreetCandidates(normalizedAddress);
+      const recoveredCandidates = await enrichRecoveryCandidates(
+        buildNearbyAddressCandidates(normalizedAddress, streetCandidates),
+        parseStreetAddress(normalizedAddress)?.streetName || "",
+      );
+      if (recoveredCandidates.length) {
+        return recoveredCandidates;
+      }
+    } catch {
+      return [];
+    }
   }
 
   if (!exactAddressMode) {
@@ -134,44 +571,6 @@ async function searchAddressCandidates(addr) {
         return [{ lat: v[0], lng: v[1], label: `${normalizedAddress} (local match)` }];
       }
     }
-  }
-
-  try {
-    const url = new URL("/api/geocode", window.location.origin);
-    for (const variant of buildAddressSearchVariants(normalizedAddress)) {
-      url.searchParams.set("q", variant);
-      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-      if (!response.ok) continue;
-      const result = await response.json();
-      if (Array.isArray(result?.candidates) && result.candidates.length) return result.candidates;
-      if (result?.best) return [result.best];
-    }
-  } catch {
-    // Direct lookup fallback below.
-  }
-
-  try {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("q", `${normalizedAddress}, San Francisco or Marin County, California`);
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("limit", "5");
-    url.searchParams.set("countrycodes", "us");
-    url.searchParams.set("bounded", "1");
-    url.searchParams.set("viewbox", "-122.55,37.93,-122.34,37.70");
-    const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Direct geocoding request failed");
-    const results = await response.json();
-    if (Array.isArray(results)) {
-      return results
-        .filter((result) => result?.lat && result?.lon)
-        .map((result) => ({
-          lat: Number(result.lat),
-          lng: Number(result.lon),
-          label: result.display_name || normalizedAddress,
-        }));
-    }
-  } catch {
-    return [];
   }
 
   return [];
@@ -978,6 +1377,8 @@ export default function RidePlanner() {
   const preset = ELEVATION_PRESETS[elevSlider];
   const ftColor = v => v <= 25 ? "#22c55e" : v <= 50 ? "#84cc16" : v <= 100 ? "#f59e0b" : "#ef4444";
   const canGo = useGPS || startAddress;
+  const normalizedStartAddress = normalizeAddressInput(startAddress);
+  const startAddressKey = buildAddressKey(startAddress);
 
   useEffect(() => {
     let cancelled = false;
@@ -1022,14 +1423,14 @@ export default function RidePlanner() {
   useEffect(() => {
     if (useGPS) return undefined;
 
-    const query = startAddress.trim();
+    const query = normalizedStartAddress;
     if (!query || query.length < 4) {
       setAddressCandidates([]);
       setAddressLookupBusy(false);
       return undefined;
     }
 
-    if (confirmedAddress?.query === query) {
+    if (isConfirmedAddressInput(query, confirmedAddress)) {
       return undefined;
     }
 
@@ -1050,7 +1451,17 @@ export default function RidePlanner() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [startAddress, useGPS, confirmedAddress]);
+  }, [normalizedStartAddress, useGPS, confirmedAddress]);
+
+  const generateRouteFromLatLng = (latlng) => {
+    const routeDefinition = selectBestDynamicRoute(distance, preset.ftPerMile, preferLoop);
+    const built = buildRoute(routeDefinition, latlng, distance);
+    setStartLatLng(latlng);
+    setRoute(built);
+    setRouteGeometry(null);
+    setStep(2);
+    setActiveTab("overview");
+  };
 
   const handleGenerate = async () => {
     if (!canGo) return;
@@ -1058,12 +1469,14 @@ export default function RidePlanner() {
     setGenerating(true);
     try {
       if (!useGPS) {
-        if (!confirmedAddress || confirmedAddress.query !== startAddress.trim()) {
-          const candidates = await searchAddressCandidates(startAddress.trim());
+        if (!isConfirmedAddressInput(startAddress, confirmedAddress)) {
+          const candidates = await searchAddressCandidates(normalizedStartAddress);
           setAddressCandidates(candidates);
           setSelectedAddressIndex(0);
           if (!candidates.length) {
             setRouteMessage("We could not find that address. Try a more complete SF or Marin address.");
+          } else if (looksLikeStreetAddress(startAddress.trim()) && hasApproximateRecoveryCandidates(candidates)) {
+            setRouteMessage("We could not verify that exact street number. Choose a nearby real address or an approximate block midpoint before we create the route.");
           } else {
             setRouteMessage(looksLikeStreetAddress(startAddress.trim())
               ? "We found address candidates. Confirm the exact address before we create the route."
@@ -1076,17 +1489,7 @@ export default function RidePlanner() {
       const latlng = useGPS
         ? [37.7996, -122.4183]
         : [confirmedAddress.lat, confirmedAddress.lng];
-      const routeDefinition = selectBestDynamicRoute(distance, preset.ftPerMile, preferLoop);
-      const built = buildRoute(
-        routeDefinition,
-        latlng,
-        distance,
-      );
-      setStartLatLng(latlng);
-      setRoute(built);
-      setRouteGeometry(null);
-      setStep(2);
-      setActiveTab("overview");
+      generateRouteFromLatLng(latlng);
     } catch {
       setRouteMessage("We could not locate that starting address. Try a more complete address or use GPS.");
     } finally {
@@ -1099,9 +1502,13 @@ export default function RidePlanner() {
     if (!candidate) return;
     setConfirmedAddress({
       ...candidate,
-      query: startAddress.trim(),
+      addressKey: buildAddressKey(candidate.label),
     });
+    setStartAddress(candidate.label);
+    setAddressCandidates([]);
+    setSelectedAddressIndex(0);
     setRouteMessage(`Starting point confirmed: ${candidate.label}`);
+    generateRouteFromLatLng([candidate.lat, candidate.lng]);
   };
 
   const handleStravaConnect = () => {
@@ -1256,12 +1663,15 @@ export default function RidePlanner() {
                 <div className="rp-inline-row">
                   <input type="text" placeholder="Address or neighborhood in SF / Marin"
                     value={startAddress} onChange={e => {
-                      setStartAddress(e.target.value);
+                      const nextAddress = e.target.value;
+                      setStartAddress(nextAddress);
                       setUseGPS(false);
                       setRouteMessage(null);
                       setAddressCandidates([]);
                       setSelectedAddressIndex(0);
-                      setConfirmedAddress(null);
+                      if (confirmedAddress && buildAddressKey(nextAddress) !== confirmedAddress.addressKey) {
+                        setConfirmedAddress(null);
+                      }
                     }}
                     style={{ flex: 1, border: "1.5px solid", borderColor: startAddress ? "#111" : "#e5e5e5", borderRadius: 10, padding: "13px 16px", fontSize: 14, background: "#fff", outline: "none", transition: "border-color 0.15s", fontFamily: "inherit" }}
                   />
@@ -1292,6 +1702,13 @@ export default function RidePlanner() {
                     <div style={{ display: "grid", gap: 8 }}>
                       {addressCandidates.slice(0, 4).map((candidate, index) => {
                         const active = selectedAddressIndex === index;
+                        const badgeLabel = candidate.matchType === "exact"
+                          ? "Exact"
+                          : candidate.matchType === "block-midpoint"
+                            ? "Midpoint"
+                            : candidate.matchType === "nearby"
+                              ? "Nearby"
+                              : null;
                         return (
                           <button
                             key={`${candidate.label}-${index}`}
@@ -1310,7 +1727,19 @@ export default function RidePlanner() {
                               lineHeight: 1.5,
                             }}
                           >
-                            {candidate.label}
+                            {badgeLabel && (
+                              <div style={{ marginBottom: 4 }}>
+                                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 999, background: active ? "#111" : "#f3f3f0", color: active ? "#fff" : "#666", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" }}>
+                                  {badgeLabel}
+                                </span>
+                              </div>
+                            )}
+                            <div>{candidate.label}</div>
+                            {candidate.helperText && (
+                              <div style={{ marginTop: 4, fontSize: 11.5, color: active ? "#555" : "#777" }}>
+                                {candidate.helperText}
+                              </div>
+                            )}
                           </button>
                         );
                       })}
@@ -1319,11 +1748,11 @@ export default function RidePlanner() {
                       onClick={handleConfirmAddress}
                       style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, border: "none", background: "#111", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                     >
-                      Confirm starting point
+                      Confirm and generate route
                     </button>
                   </div>
                 )}
-                {confirmedAddress && confirmedAddress.query === startAddress.trim() && !useGPS && (
+                {confirmedAddress && startAddressKey === confirmedAddress.addressKey && !useGPS && (
                   <p style={{ fontSize: 12, color: "#777", marginTop: 10 }}>
                     Confirmed: {confirmedAddress.label}
                   </p>
