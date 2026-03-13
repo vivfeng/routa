@@ -30,6 +30,30 @@ const SF_GEOCODES = {
   "ferry building": [37.7955, -122.3937],
   "presidio":     [37.7989, -122.4662],
   "sausalito":    [37.8590, -122.4852],
+  "tiburon":      [37.8735, -122.4567],
+  "sam's anchor": [37.8735, -122.4567],
+  "mill valley":  [37.9060, -122.5450],
+  "stinson beach":[37.8988, -122.6434],
+  "ocean beach":  [37.7600, -122.5095],
+  "golden gate park": [37.7694, -122.4862],
+  "crissy field": [37.8040, -122.4640],
+  "fort mason":   [37.8060, -122.4310],
+  "corte madera": [37.9255, -122.5275],
+  // Cafés & bakeries
+  "andytown ocean beach": [37.7648, -122.5088],
+  "andytown outer sunset":[37.7567, -122.5022],
+  "andytown taraval":     [37.7432, -122.5020],
+  "andytown":             [37.7567, -122.5022],
+  "the laundromat":       [37.7752, -122.4910],
+  "laundromat":           [37.7752, -122.4910],
+  "arsicault":            [37.7840, -122.4595],
+  "equator":              [37.8588, -122.4853],
+  "equator sausalito":    [37.8588, -122.4853],
+  "flour craft":          [37.9058, -122.5468],
+  "flour craft mill valley":[37.9058, -122.5468],
+  "sunlife":              [37.9255, -122.5275],
+  "sunlife corte madera": [37.9255, -122.5275],
+  "sun life":             [37.9255, -122.5275],
 };
 
 function parseLatLng(addr) {
@@ -1348,6 +1372,72 @@ ${trkpts}
 </gpx>`;
 }
 
+// ── Natural Language Input ────────────────────────────────────────────────────
+
+const NL_EXAMPLES = [
+  "Flat 15-mile loop from the Marina",
+  "Ride from Russian Hill to Sausalito, not too hilly",
+  "Hilly 20-mile loop starting at the Ferry Building",
+  "Ride to Sam's Anchor Cafe in Tiburon from Russian Hill, least hilly route",
+];
+
+const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+const NL_SYSTEM_PROMPT = `You extract cycling route parameters from natural language descriptions.
+The user is planning a bike ride in San Francisco / Marin County.
+
+Known starting locations and destinations: ${Object.keys(SF_GEOCODES).join(", ")}
+
+Return ONLY a JSON object (no markdown, no code fences) with these fields:
+- "startAddress": string — the starting neighborhood or address. Default "Russian Hill" if not specified.
+- "distance": number — ride distance in miles. Default 16 if not specified.
+- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
+- "preferLoop": boolean — true for loop, false for out-and-back or point-to-point. If a destination is mentioned, set false. Default true.
+- "destination": string or null — if the user wants to ride TO a specific place, put it here. Otherwise null.
+
+Examples:
+Input: "Flat 15-mile loop from the Marina"
+Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null}
+
+Input: "Ride to Sausalito from Russian Hill, not too hilly"
+Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito"}
+
+Input: "Go to Sam's Anchor Cafe from the Ferry Building with the least hills"
+Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor"}`;
+
+async function parseNaturalLanguage(text) {
+  if (!ANTHROPIC_API_KEY) throw new Error("Missing API key");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 256,
+      system: NL_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: text }],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const content = (data.content?.[0]?.text || "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+
+  return JSON.parse(content);
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function RidePlanner() {
   const [step, setStep] = useState(1);
@@ -1373,6 +1463,13 @@ export default function RidePlanner() {
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
   const [confirmedAddress, setConfirmedAddress] = useState(null);
   const [addressLookupBusy, setAddressLookupBusy] = useState(false);
+
+  // NL input state
+  const [inputMode, setInputMode] = useState("natural"); // "natural" | "form"
+  const [nlText, setNlText] = useState("");
+  const [nlParsing, setNlParsing] = useState(false);
+  const [nlError, setNlError] = useState("");
+  const [parsedIntent, setParsedIntent] = useState(null);
 
   const preset = ELEVATION_PRESETS[elevSlider];
   const ftColor = v => v <= 25 ? "#22c55e" : v <= 50 ? "#84cc16" : v <= 100 ? "#f59e0b" : "#ef4444";
@@ -1511,6 +1608,112 @@ export default function RidePlanner() {
     generateRouteFromLatLng([candidate.lat, candidate.lng]);
   };
 
+  const handleNLGenerate = async () => {
+    if (!nlText.trim()) return;
+    setNlParsing(true);
+    setNlError("");
+    setParsedIntent(null);
+
+    try {
+      const parsed = await parseNaturalLanguage(nlText.trim());
+      setParsedIntent(parsed);
+
+      // Apply parsed values to form state
+      setStartAddress(parsed.startAddress || "Russian Hill");
+      setDistance(parsed.distance || 16);
+      setElevSlider(parsed.elevationPreference ?? 1);
+      setPreferLoop(parsed.preferLoop !== false);
+
+      // Resolve start location
+      const startKey = buildAddressKey(parsed.startAddress || "Russian Hill");
+      let startLl = SF_GEOCODES[startKey];
+
+      if (!startLl) {
+        // Try partial match in SF_GEOCODES
+        const match = Object.keys(SF_GEOCODES).find(k => k.includes(startKey) || startKey.includes(k));
+        if (match) startLl = SF_GEOCODES[match];
+      }
+
+      if (!startLl) {
+        // Fall back to Mapbox geocoding
+        try {
+          const candidates = await searchAddressCandidates(parsed.startAddress);
+          if (candidates.length > 0) {
+            startLl = [candidates[0].lat, candidates[0].lng];
+            setConfirmedAddress({ ...candidates[0], addressKey: buildAddressKey(candidates[0].label) });
+            setStartAddress(candidates[0].label);
+          }
+        } catch {
+          // ignore geocoding errors, fall through to error
+        }
+      }
+
+      if (!startLl) {
+        setNlError(`Could not find "${parsed.startAddress}". Try a known SF/Marin neighborhood or switch to the form.`);
+        return;
+      }
+
+      // If there's a destination, build a direct route via OSRM
+      if (parsed.destination) {
+        const destKey = buildAddressKey(parsed.destination);
+        let destLl = SF_GEOCODES[destKey];
+
+        if (!destLl) {
+          const match = Object.keys(SF_GEOCODES).find(k => k.includes(destKey) || destKey.includes(k));
+          if (match) destLl = SF_GEOCODES[match];
+        }
+
+        if (!destLl) {
+          // Try Mapbox geocoding for destination
+          try {
+            const candidates = await searchAddressCandidates(parsed.destination);
+            if (candidates.length > 0) destLl = [candidates[0].lat, candidates[0].lng];
+          } catch {
+            // ignore
+          }
+        }
+
+        if (destLl) {
+          // Build an out-and-back route to the destination
+          const meters = distanceBetweenMeters(startLl, destLl);
+          const onewayMiles = meters / 1609.34;
+          const totalMiles = Math.round(onewayMiles * 2 * 10) / 10;
+
+          setStartLatLng(startLl);
+          setRoute({
+            name: `Ride to ${parsed.destination.charAt(0).toUpperCase() + parsed.destination.slice(1)}`,
+            description: `Out-and-back from ${parsed.startAddress} to ${parsed.destination}.`,
+            distance: totalMiles,
+            requestedDistance: parsed.distance || totalMiles,
+            distanceDelta: 0,
+            elevationGain: Math.round(totalMiles * (ELEVATION_PRESETS[parsed.elevationPreference ?? 1]?.ftPerMile || 50)),
+            ftPerMile: ELEVATION_PRESETS[parsed.elevationPreference ?? 1]?.ftPerMile || 50,
+            time: Math.round(totalMiles / 12 * 60),
+            isLoop: false,
+            routeKind: "out-and-back",
+            waypoints: [startLl, destLl],
+            isScenic: true,
+            hasGGBCrossing: false,
+          });
+          setRouteGeometry(null);
+          setStep(2);
+          setActiveTab("overview");
+          return;
+        }
+
+        // Destination not found — fall through to normal route generation
+        setNlError(`Could not find destination "${parsed.destination}". Generating a route from your start point instead.`);
+      }
+
+      // No destination or destination not found — use dynamic route selection
+      generateRouteFromLatLng(startLl);
+    } catch (err) {
+      setNlError(err.message || "Could not understand your description. Try rephrasing or switch to the form.");
+    } finally {
+      setNlParsing(false);
+    }
+  };
+
   const handleStravaConnect = () => {
     if (!stravaAvailable) {
       setStravaMessage("Strava is not configured for this deployment yet.");
@@ -1637,7 +1840,7 @@ export default function RidePlanner() {
             <span style={{ fontSize: 11, color: "#aaa", background: "#f2f2ef", borderRadius: 4, padding: "2px 7px", fontFamily: "'DM Mono',monospace" }}>SF · Marin</span>
           </div>
           {step === 2 && (
-            <button onClick={() => { setStep(1); setRoute(null); setRouteGeometry(null); setExportSuccess(null); setRouteMessage(null); }}
+            <button onClick={() => { setStep(1); setRoute(null); setRouteGeometry(null); setExportSuccess(null); setRouteMessage(null); setParsedIntent(null); }}
               style={{ fontSize: 13, color: "#555", background: "none", border: "1px solid #e5e5e5", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>
               ← New route
             </button>
@@ -1653,10 +1856,78 @@ export default function RidePlanner() {
           <div className="fade-in">
             <div className="rp-hero">
               <h1 style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.7px", lineHeight: 1.18, marginBottom: 10 }}>Plan your ride.</h1>
-              <p style={{ color: "#888", fontSize: 14.5, lineHeight: 1.65 }}>Tell us where you're starting and what you want. We'll build the route.</p>
+              <p style={{ color: "#888", fontSize: 14.5, lineHeight: 1.65 }}>
+                {inputMode === "natural"
+                  ? "Describe your ride in plain English. We'll figure out the rest."
+                  : "Tell us where you're starting and what you want. We'll build the route."}
+              </p>
             </div>
 
+            {/* ── Natural language input ──────────────────────── */}
+            {inputMode === "natural" && (
+              <div className="rp-form-grid">
+                <div>
+                  <textarea
+                    value={nlText}
+                    onChange={e => { setNlText(e.target.value); setNlError(""); }}
+                    placeholder="e.g. &quot;Flat 15-mile loop from the Marina&quot; or &quot;Ride to Sam's Anchor Cafe from Russian Hill, least hilly route&quot;"
+                    rows={3}
+                    style={{
+                      width: "100%", border: "1.5px solid", borderColor: nlText ? "#111" : "#e5e5e5",
+                      borderRadius: 12, padding: "14px 16px", fontSize: 14.5, lineHeight: 1.6,
+                      background: "#fff", outline: "none", resize: "vertical", fontFamily: "inherit",
+                      transition: "border-color 0.15s", boxSizing: "border-box",
+                    }}
+                  />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                    {NL_EXAMPLES.map(ex => (
+                      <button key={ex} onClick={() => { setNlText(ex); setNlError(""); }}
+                        style={{
+                          fontSize: 12, color: "#777", background: "#f5f5f2", border: "1px solid #ebebeb",
+                          borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontFamily: "inherit",
+                          transition: "all 0.15s",
+                        }}>
+                        {ex}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {nlError && (
+                  <div className="fade-in" style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "11px 16px", fontSize: 13, color: "#9a3412" }}>
+                    {nlError}
+                  </div>
+                )}
+
+                <button onClick={handleNLGenerate} disabled={!nlText.trim() || nlParsing}
+                  style={{
+                    width: "100%", padding: "15px", borderRadius: 12, fontSize: 14.5, fontWeight: 600,
+                    border: "none", cursor: nlText.trim() && !nlParsing ? "pointer" : "not-allowed",
+                    background: nlText.trim() && !nlParsing ? "#111" : "#e5e5e5",
+                    color: nlText.trim() && !nlParsing ? "#fff" : "#bbb",
+                    transition: "all 0.2s", letterSpacing: "-0.2px", fontFamily: "inherit",
+                  }}>
+                  {nlParsing ? <span className="blink">Understanding your ride…</span> : "Generate route →"}
+                </button>
+
+                <div style={{ textAlign: "center" }}>
+                  <button onClick={() => setInputMode("form")}
+                    style={{ fontSize: 13, color: "#999", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                    Want to decide the parameters of the ride? Use this form
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Structured form ────────────────────────────── */}
+            {inputMode === "form" && (
             <div className="rp-form-grid">
+              <div style={{ textAlign: "center", marginBottom: -4 }}>
+                <button onClick={() => setInputMode("natural")}
+                  style={{ fontSize: 13, color: "#999", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  ← Describe your ride instead
+                </button>
+              </div>
               {/* Starting point */}
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", display: "block", marginBottom: 10 }}>Starting point</label>
@@ -1848,12 +2119,40 @@ export default function RidePlanner() {
                 {generating ? <span className="blink">Finding your route…</span> : "Generate route →"}
               </button>
             </div>
+            )}
           </div>
         )}
 
         {/* ── Step 2: Route result ──────────────────────────────────────── */}
         {step === 2 && route && startLatLng && (
           <div className="slide-up">
+            {/* Parsed intent card */}
+            {parsedIntent && (
+              <div className="fade-in" style={{ marginBottom: 20, background: "#f9f9f7", border: "1px solid #ebebeb", borderRadius: 12, padding: "14px 18px" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#bbb", marginBottom: 8 }}>We understood</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {parsedIntent.startAddress && (
+                    <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
+                      From: {parsedIntent.startAddress}
+                    </span>
+                  )}
+                  {parsedIntent.destination && (
+                    <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
+                      To: {parsedIntent.destination}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
+                    {parsedIntent.distance || 16} mi
+                  </span>
+                  <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
+                    {ELEVATION_PRESETS[parsedIntent.elevationPreference ?? 1]?.label || "Moderate"}
+                  </span>
+                  <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
+                    {parsedIntent.preferLoop !== false ? "Loop" : "Out & back"}
+                  </span>
+                </div>
+              </div>
+            )}
             {/* Badges */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 9, flexWrap: "wrap" }}>
