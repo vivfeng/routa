@@ -1161,8 +1161,8 @@ function useRouteGeometry(route) {
     const parsedRoute = JSON.parse(routeKey);
     const parsedWaypoints = parsedRoute.waypoints;
     const osrmCoords = parsedWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
-    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
+    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson&exclude=ferry`;
+    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson&exclude=ferry`;
     const finalize = (geometry) => {
       const coords = geometry || parsedWaypoints;
       if (parsedRoute.isOutAndBack) return coords;
@@ -1381,61 +1381,19 @@ const NL_EXAMPLES = [
   "Ride to Sam's Anchor Cafe in Tiburon from Russian Hill, least hilly route",
 ];
 
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-
-const NL_SYSTEM_PROMPT = `You extract cycling route parameters from natural language descriptions.
-The user is planning a bike ride in San Francisco / Marin County.
-
-Known starting locations and destinations: ${Object.keys(SF_GEOCODES).join(", ")}
-
-Return ONLY a JSON object (no markdown, no code fences) with these fields:
-- "startAddress": string — the starting neighborhood or address. Default "Russian Hill" if not specified.
-- "distance": number — ride distance in miles. Default 16 if not specified.
-- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
-- "preferLoop": boolean — true for loop, false for out-and-back or point-to-point. If a destination is mentioned, set false. Default true.
-- "destination": string or null — if the user wants to ride TO a specific place, put it here. Otherwise null.
-
-Examples:
-Input: "Flat 15-mile loop from the Marina"
-Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null}
-
-Input: "Ride to Sausalito from Russian Hill, not too hilly"
-Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito"}
-
-Input: "Go to Sam's Anchor Cafe from the Ferry Building with the least hills"
-Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor"}`;
-
 async function parseNaturalLanguage(text) {
-  if (!ANTHROPIC_API_KEY) throw new Error("Missing API key");
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/parse-route", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 256,
-      system: NL_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: text }],
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`API error ${response.status}: ${err}`);
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || `API error ${response.status}`);
   }
 
-  const data = await response.json();
-  const content = (data.content?.[0]?.text || "")
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
-
-  return JSON.parse(content);
+  return response.json();
 }
 
 // ── Main App ─────────────────────────────────────────────────────────────────
