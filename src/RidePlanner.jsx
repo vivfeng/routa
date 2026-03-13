@@ -1152,6 +1152,27 @@ function cleanupBacktracks(coords, allowTurnaroundUTurn = false) {
 }
 
 // ── Fetch road-snapped route from OSRM (runs in React, not iframe) ───────────
+// Golden Gate Bridge midpoint — used as a waypoint to prevent ferry routing
+const GGB_WAYPOINT = [37.8199, -122.4783];
+
+// Check if a point is in SF (south of GGB) vs Marin (north of GGB)
+function isSF(latLng) { return latLng[0] < 37.815; }
+function isMarin(latLng) { return latLng[0] >= 37.815; }
+
+// If route crosses SF↔Marin, inject GGB waypoint to avoid ferry
+function injectBridgeWaypoint(waypoints) {
+  const result = [waypoints[0]];
+  for (let i = 1; i < waypoints.length; i++) {
+    const prev = waypoints[i - 1];
+    const curr = waypoints[i];
+    if ((isSF(prev) && isMarin(curr)) || (isMarin(prev) && isSF(curr))) {
+      result.push(GGB_WAYPOINT);
+    }
+    result.push(curr);
+  }
+  return result;
+}
+
 function useRouteGeometry(route) {
   const [coords, setCoords] = useState(null);
   const routeKey = JSON.stringify(route);
@@ -1160,9 +1181,10 @@ function useRouteGeometry(route) {
     let cancelled = false;
     const parsedRoute = JSON.parse(routeKey);
     const parsedWaypoints = parsedRoute.waypoints;
-    const osrmCoords = parsedWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson&exclude=ferry`;
-    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson&exclude=ferry`;
+    const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
+    const osrmCoords = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
+    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
+    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
     const finalize = (geometry) => {
       const coords = geometry || parsedWaypoints;
       if (parsedRoute.isOutAndBack) return coords;
