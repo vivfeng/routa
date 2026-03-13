@@ -1183,16 +1183,32 @@ function useRouteGeometry(route) {
     const parsedRoute = JSON.parse(routeKey);
     const parsedWaypoints = parsedRoute.waypoints;
     const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
-    const osrmCoords = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-    const bikeUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
-    const carUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`;
+    const coordStr = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
+
+    // Primary: Mapbox Cycling — prefers bike paths, avoids dead ends
+    const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coordStr}?overview=full&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
+    // Fallback: OSRM bike router
+    const osrmUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+
     const finalize = (geometry) => {
       const coords = geometry || parsedWaypoints;
       if (parsedRoute.isOutAndBack) return coords;
       return cleanupBacktracks(coords, Boolean(parsedRoute.allowsTurnaroundUTurn));
     };
 
-    function parse(data) {
+    function parseMapbox(data) {
+      if (data.routes && data.routes[0]) {
+        const r = data.routes[0];
+        return {
+          coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+          distanceMeters: r.distance,
+          durationSeconds: r.duration,
+        };
+      }
+      return null;
+    }
+
+    function parseOsrm(data) {
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
         const r = data.routes[0];
         return {
@@ -1213,20 +1229,21 @@ function useRouteGeometry(route) {
       });
     }
 
-    fetch(bikeUrl)
+    // Try Mapbox first, fall back to OSRM
+    fetch(mapboxUrl)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;
-        const result = parse(data);
+        const result = parseMapbox(data);
         if (result) { applyResult(result); return; }
-        return fetch(carUrl).then(r => r.json()).then(data2 => {
-          applyResult(parse(data2));
+        return fetch(osrmUrl).then(r => r.json()).then(data2 => {
+          applyResult(parseOsrm(data2));
         });
       })
       .catch(() => {
         if (cancelled) return;
-        fetch(carUrl).then(r => r.json()).then(data => {
-          applyResult(parse(data));
+        fetch(osrmUrl).then(r => r.json()).then(data => {
+          applyResult(parseOsrm(data));
         }).catch(() => { if (!cancelled) setCoords(finalize(null)); });
       });
 
