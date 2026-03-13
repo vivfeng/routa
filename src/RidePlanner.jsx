@@ -1266,15 +1266,27 @@ function useRealElevation(coords) {
       .then(r => r.json())
       .then(data => {
         if (cancelled || !data.results) return;
-        const elevations = data.results.map(r => r.elevation);
+        const raw = data.results.map(r => r.elevation);
+
+        // Smooth elevation data with a rolling average (window of 5)
+        // Open-Elevation has ~30m resolution and introduces noise that
+        // overcounts gain; window of 5 closely matches Apple/Google Maps
+        const smoothed = raw.map((val, i, arr) => {
+          const start = Math.max(0, i - 2);
+          const end = Math.min(arr.length - 1, i + 2);
+          let sum = 0;
+          for (let j = start; j <= end; j++) sum += arr[j];
+          return sum / (end - start + 1);
+        });
+
         let gain = 0;
-        for (let i = 1; i < elevations.length; i++) {
-          const diff = elevations[i] - elevations[i - 1];
+        for (let i = 1; i < smoothed.length; i++) {
+          const diff = smoothed[i] - smoothed[i - 1];
           if (diff > 0) gain += diff;
         }
         // Convert meters to feet
         const gainFt = Math.round(gain * 3.28084);
-        const profileFt = elevations.map(e => Math.round(e * 3.28084));
+        const profileFt = smoothed.map(e => Math.round(e * 3.28084));
         setElevationData({ gain: gainFt, profile: profileFt });
       })
       .catch(() => { /* fall back to estimated elevation */ });
