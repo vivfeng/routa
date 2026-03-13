@@ -1175,6 +1175,7 @@ function injectBridgeWaypoint(waypoints) {
 
 function useRouteGeometry(route) {
   const [coords, setCoords] = useState(null);
+  const [osrmStats, setOsrmStats] = useState(null); // { distanceMi, durationMin }
   const routeKey = JSON.stringify(route);
 
   useEffect(() => {
@@ -1193,9 +1194,23 @@ function useRouteGeometry(route) {
 
     function parse(data) {
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
-        return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        const r = data.routes[0];
+        return {
+          coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+          distanceMeters: r.distance,
+          durationSeconds: r.duration,
+        };
       }
       return null;
+    }
+
+    function applyResult(result) {
+      if (!result || cancelled) return;
+      setCoords(finalize(result.coords));
+      setOsrmStats({
+        distanceMi: Number((result.distanceMeters / 1609.34).toFixed(1)),
+        durationMin: Math.round(result.durationSeconds / 60),
+      });
     }
 
     fetch(bikeUrl)
@@ -1203,28 +1218,81 @@ function useRouteGeometry(route) {
       .then(data => {
         if (cancelled) return;
         const result = parse(data);
-        if (result) { setCoords(finalize(result)); return; }
+        if (result) { applyResult(result); return; }
         return fetch(carUrl).then(r => r.json()).then(data2 => {
-          if (!cancelled) setCoords(finalize(parse(data2)));
+          applyResult(parse(data2));
         });
       })
       .catch(() => {
         if (cancelled) return;
         fetch(carUrl).then(r => r.json()).then(data => {
-          if (!cancelled) setCoords(finalize(parse(data)));
+          applyResult(parse(data));
         }).catch(() => { if (!cancelled) setCoords(finalize(null)); });
       });
 
     return () => { cancelled = true; };
   }, [routeKey]);
 
-  return coords;
+  return { coords, osrmStats };
+}
+
+// ── Fetch real elevation from Open-Elevation API ─────────────────────────────
+function samplePoints(coords, numSamples) {
+  if (!coords || coords.length < 2) return [];
+  const step = Math.max(1, Math.floor(coords.length / numSamples));
+  const sampled = [];
+  for (let i = 0; i < coords.length; i += step) sampled.push(coords[i]);
+  if (sampled[sampled.length - 1] !== coords[coords.length - 1]) sampled.push(coords[coords.length - 1]);
+  return sampled;
+}
+
+function useRealElevation(coords) {
+  const [elevationData, setElevationData] = useState(null); // { gain, profile }
+  const coordsKey = coords ? `${coords.length}-${coords[0]?.[0]?.toFixed(4)}-${coords[coords.length-1]?.[0]?.toFixed(4)}` : null;
+
+  useEffect(() => {
+    if (!coords || coords.length < 2) return;
+    let cancelled = false;
+
+    // Sample ~80 points along the route for elevation
+    const sampled = samplePoints(coords, 80);
+    const locations = sampled.map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+
+    fetch("https://api.open-elevation.com/api/v1/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locations }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data.results) return;
+        const elevations = data.results.map(r => r.elevation);
+        let gain = 0;
+        for (let i = 1; i < elevations.length; i++) {
+          const diff = elevations[i] - elevations[i - 1];
+          if (diff > 0) gain += diff;
+        }
+        // Convert meters to feet
+        const gainFt = Math.round(gain * 3.28084);
+        const profileFt = elevations.map(e => Math.round(e * 3.28084));
+        setElevationData({ gain: gainFt, profile: profileFt });
+      })
+      .catch(() => { /* fall back to estimated elevation */ });
+
+    return () => { cancelled = true; };
+  }, [coordsKey]);
+
+  return elevationData;
 }
 
 // ── Map component — Leaflet in iframe srcdoc, coords resolved by React ───────
-function RouteMap({ route, startLatLng, onGeometryResolved }) {
-  const resolvedCoords = useRouteGeometry(route);
+function RouteMap({ route, startLatLng, onGeometryResolved, onOsrmStats }) {
+  const { coords: resolvedCoords, osrmStats } = useRouteGeometry(route);
   const displayCoords = resolvedCoords || route.waypoints;
+
+  useEffect(() => {
+    onOsrmStats?.(osrmStats);
+  }, [osrmStats, onOsrmStats]);
   const coordsJson = JSON.stringify(displayCoords);
   const last = route.waypoints[route.waypoints.length-1];
   const isLoop = Math.abs(route.waypoints[0][0] - last[0]) < 0.001 && Math.abs(route.waypoints[0][1] - last[1]) < 0.001;
@@ -1438,6 +1506,8 @@ export default function RidePlanner() {
   const [exportSuccess, setExportSuccess] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [routeGeometry, setRouteGeometry] = useState(null);
+  const [osrmStats, setOsrmStats] = useState(null);
+  const realElevation = useRealElevation(routeGeometry);
   const [routeMessage, setRouteMessage] = useState(null);
   const [addressCandidates, setAddressCandidates] = useState([]);
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
@@ -1535,7 +1605,7 @@ export default function RidePlanner() {
     const built = buildRoute(routeDefinition, latlng, distance);
     setStartLatLng(latlng);
     setRoute(built);
-    setRouteGeometry(null);
+    setRouteGeometry(null); setOsrmStats(null);
     setStep(2);
     setActiveTab("overview");
   };
@@ -1675,7 +1745,7 @@ export default function RidePlanner() {
             isScenic: true,
             hasGGBCrossing: false,
           });
-          setRouteGeometry(null);
+          setRouteGeometry(null); setOsrmStats(null);
           setStep(2);
           setActiveTab("overview");
           return;
@@ -1820,7 +1890,7 @@ export default function RidePlanner() {
             <span style={{ fontSize: 11, color: "#aaa", background: "#f2f2ef", borderRadius: 4, padding: "2px 7px", fontFamily: "'DM Mono',monospace" }}>SF · Marin</span>
           </div>
           {step === 2 && (
-            <button onClick={() => { setStep(1); setRoute(null); setRouteGeometry(null); setExportSuccess(null); setRouteMessage(null); setParsedIntent(null); }}
+            <button onClick={() => { setStep(1); setRoute(null); setRouteGeometry(null); setOsrmStats(null); setExportSuccess(null); setRouteMessage(null); setParsedIntent(null); }}
               style={{ fontSize: 13, color: "#555", background: "none", border: "1px solid #e5e5e5", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>
               ← New route
             </button>
@@ -2143,14 +2213,22 @@ export default function RidePlanner() {
               <p style={{ fontSize: 14, color: "#777", lineHeight: 1.65, maxWidth: 500 }}>{route.description}</p>
             </div>
 
-            {/* Stats */}
+            {/* Stats — prefer real OSRM/elevation data when available */}
             <div className="rp-stats-grid">
-              {[
-                { label: "Distance", value: route.distance, unit: "mi" },
-                { label: "Elevation", value: route.elevationGain, unit: "ft" },
-                { label: "Avg grade", value: route.ftPerMile, unit: "ft/mi" },
-                { label: "Est. time", value: route.time, unit: "min" },
-              ].map(s => (
+              {(() => {
+                const realDist = osrmStats?.distanceMi ?? null;
+                const realElev = realElevation?.gain ?? null;
+                const dist = realDist ?? route.distance;
+                const elev = realElev ?? route.elevationGain;
+                const grade = realDist && realElev ? Math.round(elev / dist) : route.ftPerMile;
+                const time = osrmStats?.durationMin ?? route.time;
+                return [
+                  { label: "Distance", value: dist, unit: "mi" },
+                  { label: "Elevation", value: elev, unit: "ft" },
+                  { label: "Avg grade", value: grade, unit: "ft/mi" },
+                  { label: "Est. time", value: time, unit: "min" },
+                ];
+              })().map(s => (
                 <div key={s.label} style={{ background: "#fff", border: "1px solid #ebebeb", borderRadius: 12, padding: "15px 13px" }}>
                   <div style={{ fontSize: 11, color: "#bbb", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{s.label}</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
@@ -2163,7 +2241,7 @@ export default function RidePlanner() {
 
             {/* Map */}
             <div style={{ background: "#ede9e0", border: "1px solid #ddd8cc", borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
-              <RouteMap route={route} startLatLng={startLatLng} onGeometryResolved={setRouteGeometry} />
+              <RouteMap route={route} startLatLng={startLatLng} onGeometryResolved={setRouteGeometry} onOsrmStats={setOsrmStats} />
               {route.hasGGBCrossing && (
                 <div style={{ padding: "10px 16px", background: "#fffbeb", borderTop: "1px solid #fef3c7" }}>
                   <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.55 }}>* GGB west sidewalk open sunrise–sunset. Confirm hours at nps.gov/goga before riding.</p>
@@ -2183,7 +2261,7 @@ export default function RidePlanner() {
 
             {activeTab === "overview" && (
               <div className="fade-in" style={{ fontSize: 14, color: "#555", lineHeight: 1.75 }}>
-                <p>{route.isOutAndBack ? "Route rides out to a turnaround point, then returns on the same corridor." : route.isLoop ? "Route starts and ends at your location." : "Route starts at your location and finishes at the planned destination."} Built for a moderate pace (~12 mph avg), total ride time about {Math.floor(route.time / 60) > 0 ? `${Math.floor(route.time / 60)}h ` : ""}{route.time % 60}min. Suitable for road bikes. Primarily paved — some crushed gravel in park sections.</p>
+                <p>{route.isOutAndBack ? "Route rides out to a turnaround point, then returns on the same corridor." : route.isLoop ? "Route starts and ends at your location." : "Route starts at your location and finishes at the planned destination."} Built for a moderate pace (~12 mph avg), total ride time about {(() => { const t = osrmStats?.durationMin ?? route.time; return `${Math.floor(t / 60) > 0 ? `${Math.floor(t / 60)}h ` : ""}${t % 60}min`; })()}. Suitable for road bikes. Primarily paved — some crushed gravel in park sections.</p>
                 {Math.abs(route.distanceDelta) > 0.1 && (
                   <p style={{ marginTop: 12 }}>
                     Requested {route.requestedDistance.toFixed(1)} mi. Best clean match is {route.distance.toFixed(1)} mi to keep the route shape natural.
@@ -2198,20 +2276,26 @@ export default function RidePlanner() {
               </div>
             )}
 
-            {activeTab === "elevation" && (
+            {activeTab === "elevation" && (() => {
+              const elev = realElevation?.gain ?? route.elevationGain;
+              const dist = osrmStats?.distanceMi ?? route.distance;
+              const grade = realElevation && osrmStats ? Math.round(elev / dist) : route.ftPerMile;
+              const profile = realElevation?.profile ?? route.elevationProfile;
+              return (
               <div className="fade-in">
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14 }}>
-                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: ftColor(route.ftPerMile) }} />
-                  <span style={{ fontSize: 13, color: "#555" }}>{route.ftPerMile <= 50 ? "Low elevation — comfortable for most riders." : "Moderate — some climbing involved."}</span>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: ftColor(grade) }} />
+                  <span style={{ fontSize: 13, color: "#555" }}>{grade <= 50 ? "Low elevation — comfortable for most riders." : "Moderate — some climbing involved."}</span>
                 </div>
                 <div style={{ background: "#fff", border: "1px solid #ebebeb", borderRadius: 12, padding: "16px 20px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11, color: "#ccc" }}>
-                    <span>Start</span><span style={{ fontFamily: "'DM Mono',monospace" }}>{route.elevationGain} ft total gain</span><span>Finish</span>
+                    <span>Start</span><span style={{ fontFamily: "'DM Mono',monospace" }}>{elev} ft total gain</span><span>Finish</span>
                   </div>
-                  <ElevationChart profile={route.elevationProfile} distance={route.distance} />
+                  <ElevationChart profile={profile} distance={dist} />
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {activeTab === "scenic" && (
               <div className="fade-in">
