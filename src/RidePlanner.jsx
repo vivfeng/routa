@@ -1736,15 +1736,20 @@ export default function RidePlanner() {
         }
 
         if (destLl) {
-          // Build an out-and-back route to the destination
           const meters = distanceBetweenMeters(startLl, destLl);
           const onewayMiles = meters / 1609.34;
-          const totalMiles = Math.round(onewayMiles * 2 * 10) / 10;
+          const isRoundTrip = parsed.roundTrip === true;
+          const totalMiles = isRoundTrip
+            ? Math.round(onewayMiles * 2 * 10) / 10
+            : Math.round(onewayMiles * 10) / 10;
+          const destName = parsed.destination.charAt(0).toUpperCase() + parsed.destination.slice(1);
 
           setStartLatLng(startLl);
           setRoute({
-            name: `Ride to ${parsed.destination.charAt(0).toUpperCase() + parsed.destination.slice(1)}`,
-            description: `Out-and-back from ${parsed.startAddress} to ${parsed.destination}.`,
+            name: `Ride to ${destName}`,
+            description: isRoundTrip
+              ? `Out-and-back from ${parsed.startAddress} to ${parsed.destination}.`
+              : `${parsed.startAddress} to ${parsed.destination}.`,
             distance: totalMiles,
             requestedDistance: parsed.distance || totalMiles,
             distanceDelta: 0,
@@ -1752,8 +1757,9 @@ export default function RidePlanner() {
             ftPerMile: ELEVATION_PRESETS[parsed.elevationPreference ?? 1]?.ftPerMile || 50,
             time: Math.round(totalMiles / 12 * 60),
             isLoop: false,
-            routeKind: "out-and-back",
-            waypoints: [startLl, destLl],
+            isOutAndBack: isRoundTrip,
+            routeKind: isRoundTrip ? "out-and-back" : "point-to-point",
+            waypoints: isRoundTrip ? [startLl, destLl, startLl] : [startLl, destLl],
             isScenic: true,
             hasGGBCrossing: false,
           });

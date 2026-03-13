@@ -18,19 +18,23 @@ Known starting locations and destinations: ${KNOWN_LOCATIONS.join(", ")}
 Return ONLY a JSON object (no markdown, no code fences) with these fields:
 - "startAddress": string — the starting neighborhood or address. Default "Russian Hill" if not specified.
 - "distance": number — ride distance in miles. Default 16 if not specified.
-- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
+- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy"/"fewest hills"/"least hills" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
 - "preferLoop": boolean — true for loop, false for out-and-back or point-to-point. If a destination is mentioned, set false. Default true.
 - "destination": string or null — if the user wants to ride TO a specific place, put it here. Otherwise null.
+- "roundTrip": boolean — true ONLY if the user explicitly says "and back", "round trip", "out and back", or similar. If they just say "ride to X", this is false (one-way). Default false when destination is specified, true when no destination.
 
 Examples:
 Input: "Flat 15-mile loop from the Marina"
-Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null}
+Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null,"roundTrip":true}
 
 Input: "Ride to Sausalito from Russian Hill, not too hilly"
-Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito"}
+Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito","roundTrip":false}
 
 Input: "Go to Sam's Anchor Cafe from the Ferry Building with the least hills"
-Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor"}`;
+Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor","roundTrip":false}
+
+Input: "Ride to Equator in Sausalito and back, keep it flat"
+Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"equator sausalito","roundTrip":true}`;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
