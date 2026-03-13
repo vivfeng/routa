@@ -1268,12 +1268,12 @@ function useRealElevation(coords) {
         if (cancelled || !data.results) return;
         const raw = data.results.map(r => r.elevation);
 
-        // Smooth elevation data with a rolling average (window of 5)
-        // Open-Elevation has ~30m resolution and introduces noise that
-        // overcounts gain; window of 5 closely matches Apple/Google Maps
+        // Smooth elevation data with a rolling average (window of 3)
+        // Open-Elevation has ~30m resolution and introduces noise;
+        // window of 3 balances noise reduction with accuracy
         const smoothed = raw.map((val, i, arr) => {
-          const start = Math.max(0, i - 2);
-          const end = Math.min(arr.length - 1, i + 2);
+          const start = Math.max(0, i - 1);
+          const end = Math.min(arr.length - 1, i + 1);
           let sum = 0;
           for (let j = start; j <= end; j++) sum += arr[j];
           return sum / (end - start + 1);
