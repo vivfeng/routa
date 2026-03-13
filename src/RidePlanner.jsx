@@ -54,6 +54,13 @@ const SF_GEOCODES = {
   "sunlife":              [37.9255, -122.5275],
   "sunlife corte madera": [37.9255, -122.5275],
   "sun life":             [37.9255, -122.5275],
+  // Philz Coffee locations
+  "philz":                [37.9240, -122.5260],  // Corte Madera (Town Center)
+  "philz corte madera":   [37.9240, -122.5260],
+  "philz marina":         [37.8005, -122.4370],
+  "philz castro":         [37.7610, -122.4350],
+  "philz mission":        [37.7563, -122.4195],
+  "philz noe valley":     [37.7502, -122.4328],
 };
 
 function parseLatLng(addr) {
@@ -2258,7 +2265,7 @@ export default function RidePlanner() {
                     {ELEVATION_PRESETS[parsedIntent.elevationPreference ?? 1]?.label || "Moderate"}
                   </span>
                   <span style={{ fontSize: 12.5, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 8, padding: "5px 10px", color: "#555" }}>
-                    {parsedIntent.preferLoop !== false ? "Loop" : "Out & back"}
+                    {parsedIntent.destination ? (parsedIntent.roundTrip ? "Out & back" : "One-way") : (parsedIntent.preferLoop !== false ? "Loop" : "Out & back")}
                   </span>
                 </div>
               </div>

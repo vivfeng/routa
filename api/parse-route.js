@@ -8,6 +8,8 @@ const KNOWN_LOCATIONS = [
   "andytown taraval", "andytown", "the laundromat", "laundromat",
   "arsicault", "equator", "equator sausalito", "flour craft",
   "flour craft mill valley", "sunlife", "sunlife corte madera", "sun life",
+  "philz", "philz corte madera", "philz marina", "philz castro",
+  "philz mission", "philz noe valley",
 ];
 
 const SYSTEM_PROMPT = `You extract cycling route parameters from natural language descriptions.
