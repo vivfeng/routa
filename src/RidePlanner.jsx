@@ -1352,15 +1352,20 @@ function RouteMap({ route, startLatLng, onGeometryResolved, onOsrmStats }) {
   var isLoop = ${isLoop};
   var map = L.map('map', { zoomControl: true, scrollWheelZoom: true });
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://publicdomainmap.org">Public Domain Map</a>',
-    maxZoom: 19
+  // Mapbox Outdoors style — highlights bike paths, trails, and parks
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/{z}/{x}/{y}@2x?access_token=${MAPBOX_ACCESS_TOKEN}', {
+    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+    tileSize: 512,
+    zoomOffset: -1
   }).addTo(map);
 
-  // Route glow
-  L.polyline(coords, { color: '#f97316', weight: 12, opacity: 0.12, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  // Route outer glow
+  L.polyline(coords, { color: '#f97316', weight: 14, opacity: 0.1, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  // Route casing (dark outline for contrast)
+  L.polyline(coords, { color: '#c2410c', weight: 6, opacity: 0.4, lineCap: 'round', lineJoin: 'round' }).addTo(map);
   // Route line
-  var line = L.polyline(coords, { color: '#f97316', weight: 4.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+  var line = L.polyline(coords, { color: '#f97316', weight: 4, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
 
   // Start marker
   var startIcon = L.divIcon({
