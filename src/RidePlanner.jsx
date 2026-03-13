@@ -1765,25 +1765,45 @@ export default function RidePlanner() {
             ? Math.round(onewayMiles * 2 * 10) / 10
             : Math.round(onewayMiles * 10) / 10;
           const destName = parsed.destination.charAt(0).toUpperCase() + parsed.destination.slice(1);
+          const startName = parsed.startAddress || "Russian Hill";
+
+          // Detect if route crosses the Golden Gate Bridge
+          const crossesGGB = (isSF(startLl) && isMarin(destLl)) || (isMarin(startLl) && isSF(destLl));
+
+          // Build a descriptive summary
+          const descParts = [];
+          if (isRoundTrip) {
+            descParts.push(`Out-and-back from ${startName} to ${destName}`);
+          } else {
+            descParts.push(`One-way ride from ${startName} to ${destName}`);
+          }
+          if (crossesGGB) {
+            descParts.push("crossing the Golden Gate Bridge");
+          }
+          const elevPref = ELEVATION_PRESETS[parsed.elevationPreference ?? 1];
+          if (parsed.elevationPreference === 0) {
+            descParts.push("on the flattest route available");
+          } else if (parsed.elevationPreference >= 3) {
+            descParts.push("with some good climbing");
+          }
+          const description = descParts.join(", ") + ". Routed on bike paths and bike lanes where possible.";
 
           setStartLatLng(startLl);
           setRoute({
             name: `Ride to ${destName}`,
-            description: isRoundTrip
-              ? `Out-and-back from ${parsed.startAddress} to ${parsed.destination}.`
-              : `${parsed.startAddress} to ${parsed.destination}.`,
+            description,
             distance: totalMiles,
             requestedDistance: parsed.distance || totalMiles,
             distanceDelta: 0,
-            elevationGain: Math.round(totalMiles * (ELEVATION_PRESETS[parsed.elevationPreference ?? 1]?.ftPerMile || 50)),
-            ftPerMile: ELEVATION_PRESETS[parsed.elevationPreference ?? 1]?.ftPerMile || 50,
+            elevationGain: Math.round(totalMiles * (elevPref?.ftPerMile || 50)),
+            ftPerMile: elevPref?.ftPerMile || 50,
             time: Math.round(totalMiles / 12 * 60),
             isLoop: false,
             isOutAndBack: isRoundTrip,
             routeKind: isRoundTrip ? "out-and-back" : "point-to-point",
             waypoints: isRoundTrip ? [startLl, destLl, startLl] : [startLl, destLl],
             isScenic: true,
-            hasGGBCrossing: false,
+            hasGGBCrossing: crossesGGB,
           });
           setRouteGeometry(null); setOsrmStats(null);
           setStep(2);
