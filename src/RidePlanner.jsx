@@ -8,6 +8,33 @@ const ELEVATION_PRESETS = [
   { label: "Very Hilly", ftPerMile: 200 },
 ];
 
+const EXAMPLE_PROMPTS = [
+  {
+    label: "Paradise Loop from Blue Fog Coffee Shop in Marina",
+    startAddress: "Blue Fog Market, 2567 Gough Street, San Francisco, CA 94123",
+    preferLoop: true,
+    distance: 38,
+    elevSlider: 3,
+    routeId: "paradise-loop",
+  },
+  {
+    label: "From Reformation in Pac Heights take a loop around Golden Gate Park",
+    startAddress: "Reformation, 2360 Fillmore Street, San Francisco, CA 94115",
+    preferLoop: true,
+    distance: 14,
+    elevSlider: 1,
+    routeId: "park-loop",
+  },
+  {
+    label: "Hawk Hill from Russian Hill and back",
+    startAddress: "Russian Hill",
+    preferLoop: false,
+    distance: 20,
+    elevSlider: 3,
+    routeId: "hawk-hill-outback",
+  },
+];
+
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const SF_MARIN_BBOX = [-122.55, 37.70, -122.34, 37.93];
 
@@ -24,6 +51,9 @@ const SF_GEOCODES = {
   "north beach":  [37.8060, -122.4103],
   "fisherman":    [37.8080, -122.4177],
   "pacific heights": [37.7925, -122.4382],
+  "blue fog coffee shop": [37.79708, -122.42721],
+  "blue fog market": [37.79708, -122.42721],
+  "2567 gough street": [37.79708, -122.42721],
   "richmond":     [37.7800, -122.4700],
   "sunset":       [37.7528, -122.4833],
   "embarcadero":  [37.7955, -122.3937],
@@ -773,6 +803,72 @@ const ROUTE_SEGMENTS = {
       [37.8421,-122.4972],
     ],
   },
+  bridgeToSausalito: {
+    distance: 4.3,
+    scenicZones: ["Golden Gate Bridge", "Sausalito Waterfront"],
+    elevationProfile: [0, 10, -14, -42, -70, -102, -132, -156],
+    waypoints: [
+      [37.8183,-122.4785],
+      [37.8265,-122.4825],
+      [37.8355,-122.4895],
+      [37.8468,-122.4930],
+      [37.8590,-122.4830],
+    ],
+  },
+  sausalitoToTiburon: {
+    distance: 6.1,
+    scenicZones: ["Sausalito Waterfront", "Richardson Bay", "Tiburon"],
+    elevationProfile: [0, 16, 22, 12, 26, 34, 28, 40, 55, 68],
+    waypoints: [
+      [37.8590,-122.4830],
+      [37.8675,-122.4780],
+      [37.8760,-122.4700],
+      [37.8840,-122.4580],
+      [37.8915,-122.4475],
+    ],
+  },
+  paradiseDriveLoop: {
+    distance: 12.5,
+    scenicZones: ["Tiburon", "Paradise Drive", "Corte Madera Bay"],
+    elevationProfile: [0, 24, 52, 84, 116, 142, 128, 98, 76, 62, 48, 36, 28, 18, 8, 0],
+    waypoints: [
+      [37.8915,-122.4475],
+      [37.8965,-122.4330],
+      [37.9005,-122.4205],
+      [37.9045,-122.4065],
+      [37.9020,-122.3925],
+      [37.8935,-122.3890],
+      [37.8855,-122.3980],
+      [37.8805,-122.4130],
+      [37.8795,-122.4295],
+      [37.8850,-122.4415],
+      [37.8915,-122.4475],
+    ],
+  },
+  tiburonToSausalitoReturn: {
+    distance: 6.1,
+    scenicZones: ["Tiburon", "Richardson Bay", "Sausalito Waterfront"],
+    elevationProfile: [0, -10, -18, -12, -22, -30, -24, -36, -48, -60],
+    waypoints: [
+      [37.8915,-122.4475],
+      [37.8840,-122.4580],
+      [37.8760,-122.4700],
+      [37.8675,-122.4780],
+      [37.8590,-122.4830],
+    ],
+  },
+  sausalitoToBridgeSouth: {
+    distance: 4.3,
+    scenicZones: ["Sausalito Waterfront", "Golden Gate Bridge"],
+    elevationProfile: [0, 28, 62, 88, 112, 136, 154, 166],
+    waypoints: [
+      [37.8590,-122.4830],
+      [37.8468,-122.4930],
+      [37.8355,-122.4895],
+      [37.8265,-122.4825],
+      [37.8183,-122.4785],
+    ],
+  },
 };
 
 const STRAVA_MESSAGES = {
@@ -866,10 +962,12 @@ function createLoopCandidate({
   description,
   segmentIds,
   requestedFtPerMile,
+  hasGGBCrossing = false,
+  baseFtPerMileOverride,
 }) {
   const distance = totalSegmentDistance(segmentIds);
   const scenicZones = collectScenicZones(segmentIds);
-  const baseFtPerMile = scenicZones.includes("Baker Beach") ? 42 : scenicZones.includes("Ocean Beach") ? 25 : 32;
+  const baseFtPerMile = baseFtPerMileOverride ?? (scenicZones.includes("Baker Beach") ? 42 : scenicZones.includes("Ocean Beach") ? 25 : 32);
   const ftPerMile = Math.min(baseFtPerMile, requestedFtPerMile);
   const elevationGain = roundToNearest(distance * ftPerMile, 10);
   const time = Math.round(distance / 12 * 60);
@@ -883,7 +981,7 @@ function createLoopCandidate({
     isOutAndBack: false,
     isLoop: true,
     isScenic: true,
-    hasGGBCrossing: false,
+    hasGGBCrossing,
     scenicZones,
     distance,
     ftPerMile,
@@ -961,6 +1059,15 @@ function buildDynamicCandidates(requestedFtPerMile) {
       segmentIds: ["marinaApproach", "presidioCoastal", "parkToOceanFromBaker", "oceanSouthReturn", "panhandleHome"],
       requestedFtPerMile,
     }),
+    createLoopCandidate({
+      id: "paradise-loop",
+      name: "Paradise Loop",
+      description: "Cross the Golden Gate Bridge, roll through Sausalito to Tiburon, loop Paradise Drive, then ride back to SF.",
+      segmentIds: ["marinaApproach", "bridgeConnector", "bridgeVista", "bridgeToSausalito", "sausalitoToTiburon", "paradiseDriveLoop", "tiburonToSausalitoReturn", "sausalitoToBridgeSouth"],
+      requestedFtPerMile,
+      hasGGBCrossing: true,
+      baseFtPerMileOverride: 55,
+    }),
   ];
 
   const outAndBackCandidates = [
@@ -1001,7 +1108,17 @@ function buildDynamicCandidates(requestedFtPerMile) {
   return [...loopCandidates, ...outAndBackCandidates];
 }
 
-function selectBestDynamicRoute(requestedDistance, requestedFtPerMile, preferLoop) {
+function selectBestDynamicRoute(requestedDistance, requestedFtPerMile, preferLoop, preferredRouteId = null) {
+  if (preferredRouteId) {
+    const matchingCandidate = buildDynamicCandidates(requestedFtPerMile).find((candidate) => candidate.id === preferredRouteId);
+    if (matchingCandidate) {
+      return {
+        ...matchingCandidate,
+        routeTypeAdjusted: matchingCandidate.routeKind !== (preferLoop ? "loop" : "out-and-back"),
+      };
+    }
+  }
+
   const preferredRouteKind = preferLoop ? "loop" : "out-and-back";
   const candidates = buildDynamicCandidates(requestedFtPerMile).map((candidate) => {
     const distancePenalty = Math.abs(candidate.distance - requestedDistance);
@@ -1564,6 +1681,7 @@ export default function RidePlanner() {
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
   const [confirmedAddress, setConfirmedAddress] = useState(null);
   const [addressLookupBusy, setAddressLookupBusy] = useState(false);
+  const [preferredRouteId, setPreferredRouteId] = useState(null);
 
   // NL input state
   const [inputMode, setInputMode] = useState("natural"); // "natural" | "form"
@@ -1619,6 +1737,31 @@ export default function RidePlanner() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lat = parseFloat(params.get("lat"));
+    const lng = parseFloat(params.get("lng"));
+    const d = parseFloat(params.get("d"));
+    const e = parseInt(params.get("e"), 10);
+    const loop = params.get("loop");
+    if (isNaN(lat) || isNaN(lng) || isNaN(d) || isNaN(e) || loop === null) return;
+    if (e < 0 || e >= ELEVATION_PRESETS.length) return;
+
+    setDistance(d);
+    setElevSlider(e);
+    setPreferLoop(loop === "1");
+
+    const elevPreset = ELEVATION_PRESETS[e];
+    const routeDefinition = selectBestDynamicRoute(d, elevPreset.ftPerMile, loop === "1");
+    const latlng = [lat, lng];
+    const built = buildRoute(routeDefinition, latlng, d);
+    setStartLatLng(latlng);
+    setRoute(built);
+    setRouteGeometry(null);
+    setStep(2);
+    setActiveTab("overview");
+  }, []);
+
+  useEffect(() => {
     if (useGPS) return undefined;
 
     const query = normalizedStartAddress;
@@ -1651,14 +1794,26 @@ export default function RidePlanner() {
     };
   }, [normalizedStartAddress, useGPS, confirmedAddress]);
 
-  const generateRouteFromLatLng = (latlng) => {
-    const routeDefinition = selectBestDynamicRoute(distance, preset.ftPerMile, preferLoop);
-    const built = buildRoute(routeDefinition, latlng, distance);
+  const generateRouteFromLatLng = (latlng, opts) => {
+    const d = opts?.distance ?? distance;
+    const e = opts?.elevSlider ?? elevSlider;
+    const loop = opts?.preferLoop ?? preferLoop;
+    const elevPreset = ELEVATION_PRESETS[e];
+    const routeDefinition = selectBestDynamicRoute(d, elevPreset.ftPerMile, loop, opts?.preferredRouteId ?? preferredRouteId);
+    const built = buildRoute(routeDefinition, latlng, d);
     setStartLatLng(latlng);
     setRoute(built);
     setRouteGeometry(null); setOsrmStats(null);
     setStep(2);
     setActiveTab("overview");
+
+    const params = new URLSearchParams();
+    params.set("lat", latlng[0].toFixed(5));
+    params.set("lng", latlng[1].toFixed(5));
+    params.set("d", String(d));
+    params.set("e", String(e));
+    params.set("loop", loop ? "1" : "0");
+    window.history.replaceState({}, "", `${window.location.pathname}?${params}`);
   };
 
   const handleGenerate = async () => {
@@ -1707,6 +1862,22 @@ export default function RidePlanner() {
     setSelectedAddressIndex(0);
     setRouteMessage(`Starting point confirmed: ${candidate.label}`);
     generateRouteFromLatLng([candidate.lat, candidate.lng]);
+  };
+
+  const handleExamplePromptClick = (example) => {
+    setNlText(example.label);
+    setNlError("");
+    setParsedIntent(null);
+    setUseGPS(false);
+    setStartAddress(example.startAddress);
+    setPreferLoop(example.preferLoop);
+    setDistance(example.distance);
+    setElevSlider(example.elevSlider);
+    setPreferredRouteId(example.routeId);
+    setRouteMessage(null);
+    setAddressCandidates([]);
+    setSelectedAddressIndex(0);
+    setConfirmedAddress(null);
   };
 
   const handleNLGenerate = async () => {
@@ -1988,6 +2159,34 @@ export default function RidePlanner() {
                   ? "Describe your ride in plain English. We'll figure out the rest."
                   : "Tell us where you're starting and what you want. We'll build the route."}
               </p>
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", marginBottom: 10 }}>
+                  Example prompts
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {EXAMPLE_PROMPTS.map((example) => (
+                    <button
+                      key={example.label}
+                      type="button"
+                      onClick={() => handleExamplePromptClick(example)}
+                      style={{
+                        textAlign: "left",
+                        background: "#f9f9f7",
+                        border: "1px solid #ebebeb",
+                        borderRadius: 12,
+                        padding: "11px 14px",
+                        fontSize: 13,
+                        lineHeight: 1.55,
+                        color: "#555",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {example.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* ── Natural language input ──────────────────────── */}
@@ -1996,7 +2195,7 @@ export default function RidePlanner() {
                 <div>
                   <textarea
                     value={nlText}
-                    onChange={e => { setNlText(e.target.value); setNlError(""); }}
+                    onChange={e => { setNlText(e.target.value); setNlError(""); setPreferredRouteId(null); }}
                     placeholder="e.g. &quot;Flat 15-mile loop from the Marina&quot; or &quot;Ride to Sam's Anchor Cafe from Russian Hill, least hilly route&quot;"
                     rows={3}
                     style={{
@@ -2065,6 +2264,7 @@ export default function RidePlanner() {
                       setStartAddress(nextAddress);
                       setUseGPS(false);
                       setRouteMessage(null);
+                      setPreferredRouteId(null);
                       setAddressCandidates([]);
                       setSelectedAddressIndex(0);
                       if (confirmedAddress && buildAddressKey(nextAddress) !== confirmedAddress.addressKey) {
@@ -2077,6 +2277,7 @@ export default function RidePlanner() {
                     setUseGPS(true);
                     setStartAddress("Using your location");
                     setRouteMessage(null);
+                    setPreferredRouteId(null);
                     setAddressCandidates([]);
                     setSelectedAddressIndex(0);
                     setConfirmedAddress(null);
@@ -2415,7 +2616,7 @@ export default function RidePlanner() {
                   <button onClick={handleStravaSave} disabled={stravaBusy}
                     style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 18px", borderRadius: 10, border: "none", background: "#FC4C02", color: "#fff", fontSize: 13, fontWeight: 600, cursor: stravaBusy ? "wait" : "pointer", fontFamily: "inherit", opacity: stravaBusy ? 0.8 : 1 }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.599h4.172L10.463 0l-7 13.828h4.169" /></svg>
-                    {stravaBusy ? "Saving to Strava…" : "Save to Strava"}
+                    {stravaBusy ? "Importing to Strava…" : "Import to my Strava"}
                   </button>
                 )}
                 <button onClick={handleGPXDownload}
