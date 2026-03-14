@@ -61,6 +61,7 @@ const SF_GEOCODES = {
   "philz castro":         [37.7610, -122.4350],
   "philz mission":        [37.7563, -122.4195],
   "philz noe valley":     [37.7502, -122.4328],
+  "philz russian hill":   [37.7989, -122.4186],
 };
 
 function parseLatLng(addr) {
