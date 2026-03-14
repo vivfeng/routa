@@ -40,6 +40,27 @@ Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"
 Input: "Ride to Equator in Sausalito and back, keep it flat"
 Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"equator sausalito","roundTrip":true}`;
 
+function extractExplicitDistanceMiles(text) {
+  if (!text || typeof text !== "string") return null;
+
+  const patterns = [
+    /(\d+(?:\.\d+)?)\s*(?:mile|miles|mi)\b/i,
+    /\b(\d+(?:\.\d+)?)\s*-\s*(?:mile|miles)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const distance = Number.parseFloat(match[1]);
+    if (Number.isFinite(distance) && distance > 0) {
+      return Math.round(distance * 10) / 10;
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -83,6 +104,10 @@ export default async function handler(req, res) {
 
   try {
     const parsed = JSON.parse(content);
+    const explicitDistance = extractExplicitDistanceMiles(text);
+    if (explicitDistance !== null) {
+      parsed.distance = explicitDistance;
+    }
     return res.status(200).json(parsed);
   } catch {
     return res.status(500).json({ error: "Failed to parse AI response", raw: content });
