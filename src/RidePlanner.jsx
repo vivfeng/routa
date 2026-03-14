@@ -35,6 +35,10 @@ const EXAMPLE_PROMPTS = [
   },
 ];
 
+// Sampled from /Users/vivianfeng/Downloads/Paradise Loop (half).gpx
+// so curated routes can follow a real ride shape instead of a rough sketch.
+const PARADISE_LOOP_HALF_GEOMETRY = [[37.789300000000004,-122.45949000000002],[37.7918,-122.45882000000002],[37.792730000000006,-122.46110000000002],[37.79498,-122.46411],[37.79545,-122.46729],[37.79505,-122.46927000000001],[37.79437,-122.47239],[37.79395,-122.47579],[37.796820000000004,-122.477],[37.799200000000006,-122.47773000000001],[37.80219,-122.47678],[37.804410000000004,-122.47579],[37.805930000000004,-122.47584],[37.807880000000004,-122.47561],[37.80845,-122.47601000000002],[37.80848,-122.47705],[37.81407,-122.47804000000001],[37.82201333367601,-122.4789699908233],[37.828075000362695,-122.47967498998491],[37.83243,-122.48126],[37.834120000000006,-122.48413000000001],[37.83608,-122.48388000000001],[37.838660000000004,-122.48301000000001],[37.83984,-122.47921000000001],[37.841530000000006,-122.47764000000001],[37.84622,-122.47817],[37.848440000000004,-122.48077],[37.849880000000006,-122.47996],[37.855375000430264,-122.47922999844074],[37.858560000000004,-122.48344000000002],[37.86175,-122.49085000000001],[37.86372,-122.49738],[37.86929000000001,-122.50307000000001],[37.87268,-122.50560000000002],[37.878153353010205,-122.51304661806037],[37.88202000855602,-122.51806247945477],[37.88820500017211,-122.52472499906186],[37.895160000000004,-122.52590000000001],[37.899530000074286,-122.52660999840076],[37.90128,-122.52827],[37.90413,-122.52689000000001],[37.90596,-122.528],[37.90776,-122.52804],[37.91057,-122.52765000000001],[37.91189,-122.52754000000002],[37.91384,-122.52617000000001],[37.916360000000005,-122.52571],[37.91727,-122.5271],[37.91939,-122.52884000000002],[37.92034,-122.53006],[37.92183,-122.53014],[37.92289,-122.53095],[37.92454,-122.52912],[37.92638,-122.52971000000001],[37.92559,-122.52793000000001],[37.925380000000004,-122.52388],[37.92508,-122.51712],[37.927,-122.51139],[37.923880000000004,-122.51054],[37.920550000000006,-122.50992000000001],[37.91945000166232,-122.50587499981147],[37.91989,-122.49949000000001],[37.920356671820436,-122.49279999308479],[37.9204,-122.48797],[37.91857,-122.48395000000001],[37.91624,-122.48156000000002],[37.914820000000006,-122.47991],[37.91185,-122.47924],[37.909510000000004,-122.47860000000001],[37.90784,-122.47763],[37.906330000000004,-122.47996],[37.90476,-122.47853],[37.901880000000006,-122.48217000000001],[37.89887,-122.48734],[37.896980000000006,-122.49006000000001],[37.89576,-122.49164],[37.894280001476524,-122.49511499784688],[37.896930000000005,-122.49863],[37.898230000000005,-122.50138000000001],[37.89981,-122.50651],[37.90238,-122.51162000000001],[37.902950000000004,-122.51748],[37.904070000000004,-122.52273000000001],[37.901210000000006,-122.52675],[37.898099999925286,-122.52638999934494],[37.895760000144676,-122.52599999668733],[37.88873,-122.52486],[37.882940000000005,-122.51926000000002],[37.87933,-122.51457],[37.873180000000005,-122.50651],[37.869460000000004,-122.50327000000001],[37.86496000462077,-122.49895748559186],[37.86182500178142,-122.4931099996442],[37.86000000000001,-122.48673000000001],[37.85692,-122.48047000000001],[37.8530550000502,-122.47896500010057],[37.849450000000004,-122.48076],[37.84698000189796,-122.47982000026084],[37.84403500014341,-122.47810000159528],[37.84035,-122.47798000000002],[37.83966,-122.48215],[37.83672,-122.48314],[37.834540000000004,-122.4848],[37.83283,-122.48232000000002],[37.832010000000004,-122.48072],[37.82555,-122.47943000000001],[37.81877333332699,-122.47860333158022],[37.81392,-122.47803],[37.807790000000004,-122.47687],[37.80827,-122.47615],[37.807770000000005,-122.47546000000001],[37.8068,-122.47592000000002],[37.80566,-122.47598],[37.80434,-122.47579],[37.802760000000006,-122.47558000000001],[37.800050000000006,-122.47527000000001],[37.797560000000004,-122.47671000000001],[37.795590000000004,-122.47763],[37.794050001608746,-122.4742550024177],[37.79529,-122.46997],[37.795230000000004,-122.46814],[37.79616,-122.46527],[37.79314,-122.46159000000002],[37.79198,-122.45888000000001],[37.79026,-122.45869]];
+
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const SF_MARIN_BBOX = [-122.55, 37.70, -122.34, 37.93];
 
@@ -51,6 +55,9 @@ const SF_GEOCODES = {
   "north beach":  [37.8060, -122.4103],
   "fisherman":    [37.8080, -122.4177],
   "pacific heights": [37.7925, -122.4382],
+  "reformation": [37.79059, -122.43444],
+  "reformation pac heights": [37.79059, -122.43444],
+  "2360 fillmore street": [37.79059, -122.43444],
   "blue fog coffee shop": [37.79708, -122.42721],
   "blue fog market": [37.79708, -122.42721],
   "2567 gough street": [37.79708, -122.42721],
@@ -956,6 +963,18 @@ function buildOutAndBackElevationProfile(outboundSegmentIds, turnaroundSegmentId
   return scaleElevationProfile([...outboundProfile, ...mirroredReturn], targetGain);
 }
 
+function concatCoords(...coordLists) {
+  const result = [];
+  coordLists.forEach((coords) => {
+    (coords || []).forEach((coord) => {
+      if (!result.length || !isSamePoint(result[result.length - 1], coord)) {
+        result.push(coord);
+      }
+    });
+  });
+  return result;
+}
+
 function createLoopCandidate({
   id,
   name,
@@ -989,6 +1008,41 @@ function createLoopCandidate({
     elevationProfile: buildLoopElevationProfile(segmentIds, elevationGain),
     time,
     waypoints: concatSegmentWaypoints(segmentIds),
+  };
+}
+
+function createFixedGeometryLoopCandidate({
+  id,
+  name,
+  description,
+  geometryCoords,
+  scenicZones,
+  distance,
+  elevationGain,
+  time,
+  hasGGBCrossing = false,
+}) {
+  const ftPerMile = Math.round(elevationGain / Math.max(distance, 1));
+
+  return {
+    id,
+    name,
+    description,
+    routeKind: "loop",
+    allowsTurnaroundUTurn: false,
+    isOutAndBack: false,
+    isLoop: true,
+    isScenic: true,
+    hasGGBCrossing,
+    scenicZones,
+    distance,
+    ftPerMile,
+    elevationGain,
+    elevationProfile: [0, elevationGain],
+    time,
+    waypoints: geometryCoords,
+    fixedGeometryCoords: geometryCoords,
+    preserveGeometry: true,
   };
 }
 
@@ -1059,14 +1113,16 @@ function buildDynamicCandidates(requestedFtPerMile) {
       segmentIds: ["marinaApproach", "presidioCoastal", "parkToOceanFromBaker", "oceanSouthReturn", "panhandleHome"],
       requestedFtPerMile,
     }),
-    createLoopCandidate({
+    createFixedGeometryLoopCandidate({
       id: "paradise-loop",
       name: "Paradise Loop",
-      description: "Cross the Golden Gate Bridge, roll through Sausalito to Tiburon, loop Paradise Drive, then ride back to SF.",
-      segmentIds: ["marinaApproach", "bridgeConnector", "bridgeVista", "bridgeToSausalito", "sausalitoToTiburon", "paradiseDriveLoop", "tiburonToSausalitoReturn", "sausalitoToBridgeSouth"],
-      requestedFtPerMile,
+      description: "Based on a real Paradise Loop GPX: cross the Golden Gate Bridge, ride through Sausalito and Tiburon, loop Paradise Drive, then return.",
+      geometryCoords: PARADISE_LOOP_HALF_GEOMETRY,
+      scenicZones: ["Golden Gate Bridge", "Sausalito Waterfront", "Tiburon", "Paradise Drive"],
+      distance: 32.3,
+      elevationGain: 1642,
+      time: 162,
       hasGGBCrossing: true,
-      baseFtPerMileOverride: 55,
     }),
   ];
 
@@ -1161,6 +1217,17 @@ function selectBestDynamicRoute(requestedDistance, requestedFtPerMile, preferLoo
 }
 
 function buildRoute(routeDefinition, userLatLng, requestedDistance) {
+  if (routeDefinition.preserveGeometry && Array.isArray(routeDefinition.fixedGeometryCoords)) {
+    return {
+      ...routeDefinition,
+      requestedDistance,
+      distanceDelta: Number((routeDefinition.distance - requestedDistance).toFixed(1)),
+      waypoints: routeDefinition.fixedGeometryCoords,
+      connectorStartLatLng: userLatLng,
+      connectorEndLatLng: routeDefinition.isLoop ? userLatLng : null,
+    };
+  }
+
   const waypoints = routeDefinition.isLoop
     ? [userLatLng, ...routeDefinition.waypoints, userLatLng]
     : [userLatLng, ...routeDefinition.waypoints];
@@ -1307,6 +1374,13 @@ function injectBridgeWaypoint(waypoints) {
   return result;
 }
 
+function buildDirectConnectorStats(coords) {
+  if (!coords || coords.length < 2) return { distanceMeters: 0, durationSeconds: 0 };
+  const distanceMeters = totalPathDistanceMeters(coords, 0, coords.length - 1);
+  const durationSeconds = (distanceMeters / 1609.34) / 12 * 3600;
+  return { distanceMeters, durationSeconds };
+}
+
 function useRouteGeometry(route) {
   const [coords, setCoords] = useState(null);
   const [osrmStats, setOsrmStats] = useState(null); // { distanceMi, durationMin }
@@ -1315,6 +1389,91 @@ function useRouteGeometry(route) {
   useEffect(() => {
     let cancelled = false;
     const parsedRoute = JSON.parse(routeKey);
+
+    if (parsedRoute.preserveGeometry && Array.isArray(parsedRoute.fixedGeometryCoords)) {
+      const baseCoords = parsedRoute.fixedGeometryCoords;
+      const tasks = [];
+
+      const needsStartConnector = Array.isArray(parsedRoute.connectorStartLatLng)
+        && distanceBetweenMeters(parsedRoute.connectorStartLatLng, baseCoords[0]) > 60;
+      const needsEndConnector = Array.isArray(parsedRoute.connectorEndLatLng)
+        && distanceBetweenMeters(baseCoords[baseCoords.length - 1], parsedRoute.connectorEndLatLng) > 60;
+
+      const fetchConnector = async (from, to) => {
+        const coordStr = `${from[1]},${from[0]};${to[1]},${to[0]}`;
+        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coordStr}?overview=full&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
+        const osrmUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+
+        try {
+          const mapboxData = await fetch(mapboxUrl).then((response) => response.json());
+          const mapboxResult = mapboxData.routes?.[0];
+          if (mapboxResult?.geometry?.coordinates) {
+            return {
+              coords: mapboxResult.geometry.coordinates.map((coord) => [coord[1], coord[0]]),
+              distanceMeters: mapboxResult.distance || 0,
+              durationSeconds: mapboxResult.duration || 0,
+            };
+          }
+        } catch {
+          // Fall through to OSRM.
+        }
+
+        try {
+          const osrmData = await fetch(osrmUrl).then((response) => response.json());
+          const osrmResult = osrmData.routes?.[0];
+          if (osrmData.code === "Ok" && osrmResult?.geometry?.coordinates) {
+            return {
+              coords: osrmResult.geometry.coordinates.map((coord) => [coord[1], coord[0]]),
+              distanceMeters: osrmResult.distance || 0,
+              durationSeconds: osrmResult.duration || 0,
+            };
+          }
+        } catch {
+          // Fall back to the straight connector below.
+        }
+
+        return {
+          coords: [from, to],
+          ...buildDirectConnectorStats([from, to]),
+        };
+      };
+
+      if (needsStartConnector) tasks.push(fetchConnector(parsedRoute.connectorStartLatLng, baseCoords[0]));
+      else tasks.push(Promise.resolve(null));
+      if (needsEndConnector) tasks.push(fetchConnector(baseCoords[baseCoords.length - 1], parsedRoute.connectorEndLatLng));
+      else tasks.push(Promise.resolve(null));
+
+      Promise.all(tasks).then(([startConnector, endConnector]) => {
+        if (cancelled) return;
+        const displayCoords = concatCoords(
+          startConnector?.coords,
+          baseCoords,
+          endConnector?.coords,
+        );
+        const connectorDistanceMeters = (startConnector?.distanceMeters || 0) + (endConnector?.distanceMeters || 0);
+        const connectorDurationSeconds = (startConnector?.durationSeconds || 0) + (endConnector?.durationSeconds || 0);
+        const baseDistanceMeters = totalPathDistanceMeters(baseCoords, 0, baseCoords.length - 1);
+        const totalDistanceMeters = baseDistanceMeters + connectorDistanceMeters;
+        const totalDurationSeconds = (baseDistanceMeters / 1609.34) / 12 * 3600 + connectorDurationSeconds;
+
+        setCoords(displayCoords);
+        setOsrmStats({
+          distanceMi: Number((totalDistanceMeters / 1609.34).toFixed(1)),
+          durationMin: Math.round(totalDurationSeconds / 60),
+        });
+      }).catch(() => {
+        if (cancelled) return;
+        setCoords(baseCoords);
+        const baseDistanceMeters = totalPathDistanceMeters(baseCoords, 0, baseCoords.length - 1);
+        setOsrmStats({
+          distanceMi: Number((baseDistanceMeters / 1609.34).toFixed(1)),
+          durationMin: Math.round((baseDistanceMeters / 1609.34) / 12 * 60),
+        });
+      });
+
+      return () => { cancelled = true; };
+    }
+
     const parsedWaypoints = parsedRoute.waypoints;
     const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
     const coordStr = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
@@ -1632,13 +1791,6 @@ ${trkpts}
 
 // ── Natural Language Input ────────────────────────────────────────────────────
 
-const NL_EXAMPLES = [
-  "Flat 15-mile loop from the Marina",
-  "Ride from Russian Hill to Sausalito, not too hilly",
-  "Hilly 20-mile loop starting at the Ferry Building",
-  "Ride to Sam's Anchor Cafe in Tiburon from Russian Hill, least hilly route",
-];
-
 async function parseNaturalLanguage(text) {
   const response = await fetch("/api/parse-route", {
     method: "POST",
@@ -1695,6 +1847,7 @@ export default function RidePlanner() {
   const canGo = useGPS || startAddress;
   const normalizedStartAddress = normalizeAddressInput(startAddress);
   const startAddressKey = buildAddressKey(startAddress);
+  const findExamplePrompt = (text) => EXAMPLE_PROMPTS.find((example) => buildAddressKey(example.label) === buildAddressKey(text));
 
   useEffect(() => {
     let cancelled = false;
@@ -1887,6 +2040,51 @@ export default function RidePlanner() {
     setParsedIntent(null);
 
     try {
+      const matchedExample = findExamplePrompt(nlText.trim());
+      if (matchedExample) {
+        setStartAddress(matchedExample.startAddress);
+        setDistance(matchedExample.distance);
+        setElevSlider(matchedExample.elevSlider);
+        setPreferLoop(matchedExample.preferLoop);
+        setPreferredRouteId(matchedExample.routeId);
+
+        const exampleKey = buildAddressKey(matchedExample.startAddress);
+        let startLl = SF_GEOCODES[exampleKey];
+
+        if (!startLl) {
+          const match = Object.keys(SF_GEOCODES).find((key) => key.includes(exampleKey) || exampleKey.includes(key));
+          if (match) startLl = SF_GEOCODES[match];
+        }
+
+        if (!startLl) {
+          const candidates = await searchAddressCandidates(matchedExample.startAddress);
+          if (candidates.length > 0) {
+            startLl = [candidates[0].lat, candidates[0].lng];
+            setConfirmedAddress({ ...candidates[0], addressKey: buildAddressKey(candidates[0].label) });
+            setStartAddress(candidates[0].label);
+          }
+        }
+
+        if (!startLl) {
+          setNlError(`Could not find "${matchedExample.startAddress}". Try again in form mode.`);
+          return;
+        }
+
+        setParsedIntent({
+          startAddress: matchedExample.startAddress,
+          distance: matchedExample.distance,
+          elevationPreference: matchedExample.elevSlider,
+          preferLoop: matchedExample.preferLoop,
+        });
+        generateRouteFromLatLng(startLl, {
+          distance: matchedExample.distance,
+          elevSlider: matchedExample.elevSlider,
+          preferLoop: matchedExample.preferLoop,
+          preferredRouteId: matchedExample.routeId,
+        });
+        return;
+      }
+
       const parsed = await parseNaturalLanguage(nlText.trim());
       setParsedIntent(parsed);
 
@@ -2159,34 +2357,6 @@ export default function RidePlanner() {
                   ? "Describe your ride in plain English. We'll figure out the rest."
                   : "Tell us where you're starting and what you want. We'll build the route."}
               </p>
-              <div style={{ marginTop: 18 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", marginBottom: 10 }}>
-                  Example prompts
-                </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {EXAMPLE_PROMPTS.map((example) => (
-                    <button
-                      key={example.label}
-                      type="button"
-                      onClick={() => handleExamplePromptClick(example)}
-                      style={{
-                        textAlign: "left",
-                        background: "#f9f9f7",
-                        border: "1px solid #ebebeb",
-                        borderRadius: 12,
-                        padding: "11px 14px",
-                        fontSize: 13,
-                        lineHeight: 1.55,
-                        color: "#555",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {example.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* ── Natural language input ──────────────────────── */}
@@ -2205,17 +2375,22 @@ export default function RidePlanner() {
                       transition: "border-color 0.15s", boxSizing: "border-box",
                     }}
                   />
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                    {NL_EXAMPLES.map(ex => (
-                      <button key={ex} onClick={() => { setNlText(ex); setNlError(""); }}
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#999", marginBottom: 10 }}>
+                      Example prompts
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {EXAMPLE_PROMPTS.map((example) => (
+                      <button key={example.label} onClick={() => handleExamplePromptClick(example)}
                         style={{
                           fontSize: 12, color: "#777", background: "#f5f5f2", border: "1px solid #ebebeb",
                           borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontFamily: "inherit",
                           transition: "all 0.15s",
                         }}>
-                        {ex}
+                        {example.label}
                       </button>
                     ))}
+                    </div>
                   </div>
                 </div>
 
@@ -2539,12 +2714,27 @@ export default function RidePlanner() {
 
             {activeTab === "overview" && (
               <div className="fade-in" style={{ fontSize: 14, color: "#555", lineHeight: 1.75 }}>
-                <p>{route.isOutAndBack ? "Route rides out to a turnaround point, then returns on the same corridor." : route.isLoop ? "Route starts and ends at your location." : "Route starts at your location and finishes at the planned destination."} Built for a moderate pace (~12 mph avg), total ride time about {(() => { const t = osrmStats?.durationMin ?? route.time; return `${Math.floor(t / 60) > 0 ? `${Math.floor(t / 60)}h ` : ""}${t % 60}min`; })()}. Suitable for road bikes. Primarily paved — some crushed gravel in park sections.</p>
-                {Math.abs(route.distanceDelta) > 0.1 && (
-                  <p style={{ marginTop: 12 }}>
-                    Requested {route.requestedDistance.toFixed(1)} mi. Best clean match is {route.distance.toFixed(1)} mi to keep the route shape natural.
-                  </p>
-                )}
+                {(() => {
+                  const t = osrmStats?.durationMin ?? route.time;
+                  const actualDistance = osrmStats?.distanceMi ?? route.distance;
+                  const routeTypeSummary = route.isOutAndBack
+                    ? "Route rides out to a turnaround point, then returns on the same corridor."
+                    : route.isLoop
+                      ? "Route starts and ends at your location."
+                      : "Route starts at your location and finishes at the planned destination.";
+                  const timeSummary = `${Math.floor(t / 60) > 0 ? `${Math.floor(t / 60)}h ` : ""}${t % 60}min`;
+
+                  return (
+                    <>
+                      <p>{routeTypeSummary} Built for a moderate pace (~12 mph avg), total ride time about {timeSummary}. Suitable for road bikes. Primarily paved — some crushed gravel in park sections.</p>
+                      {Math.abs(actualDistance - route.requestedDistance) > 0.1 && (
+                        <p style={{ marginTop: 12 }}>
+                          Requested {route.requestedDistance.toFixed(1)} mi. Current routed distance is {actualDistance.toFixed(1)} mi.
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
                 {route.routeTypeAdjusted && (
                   <p style={{ marginTop: 12 }}>
                     We switched the route type to keep the ride closer to your requested mileage without forcing a bad-looking route.
