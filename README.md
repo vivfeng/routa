@@ -1,37 +1,43 @@
-# Routa — SF / Marin Ride Planner
+# RideRouta — SF / Marin Ride Planner
 
-Cycling route planner for San Francisco and Marin with curated rides, road-snapped maps, elevation summaries, and GPX export.
+Cycling route planner for San Francisco and Marin with natural language route creation, road-snapped maps, elevation summaries, and GPX export.
 
-Routa is a lightweight ride-planning app for cyclists who know the kind of ride they want, but do not want to build it point by point in a traditional mapping tool. Instead of dragging a route around Strava or Garmin to avoid bad roads or too much climbing, you set a starting point, choose your target distance, pick an elevation preference, and decide between a loop or an out-and-back. Routa then returns a curated SF/Marin ride, renders it on an interactive map, summarizes the climbing, and lets you export the route as GPX.
+RideRouta lets cyclists create rides by describing what they want in plain English — or by using a form for more control. Instead of dragging waypoints around Strava or Garmin to avoid bad roads or too much climbing, you tell Routa where you want to go and it builds the route for you. It geocodes your start and destination, fetches bike-friendly geometry from OSRM, renders the ride on an interactive map, summarizes the climbing, and lets you export the route as GPX.
 
-The current product is intentionally narrow: it focuses on a small set of high-signal route templates around San Francisco and Marin, client-side neighborhood lookup, fast browser-based rendering, and a simple export workflow. It is designed as a front-end prototype that demonstrates the product experience without requiring a backend.
+Two ways to create a route:
 
-## Why Routa
+- **Natural language** — Describe your ideal ride (e.g., "Ride from the Marina to Corte Madera and back") and the NLP parser extracts start, destination, distance, elevation preference, and route type.
+- **Form mode** — Set your starting point, target distance, elevation preference, and route type (loop or out-and-back) for more granular control.
+
+When a destination is specified, Routa builds a custom point-to-point or round-trip route between the two locations. When no destination is given, it selects from a set of curated SF/Marin loop and out-and-back templates that match the requested distance and effort level.
+
+## Why RideRouta
 
 - Route planning starts from ride intent, not manual map editing
-- The app is optimized for common SF/Marin recreational road rides
-- Curated templates keep suggestions scenic and understandable
+- Natural language input lets you describe a ride the way you'd tell a friend
+- Form mode gives full control over distance, elevation, and route type
 - Everything runs in the browser, including route generation and GPX export
 
 ## Features
 
-- **Signal-based route input** — Choose a starting neighborhood or GPS, target distance, climbing preference, and route type
-- **Curated ride templates** — Includes Golden Gate Loop, Golden Gate to Sausalito, and Ocean Beach & Sunset
-- **Road-snapped map rendering** — Uses OSRM geometry on top of Leaflet and OpenStreetMap tiles
+- **Natural language route creation** — Describe your ride in plain English and Routa figures out the rest
+- **Form-based route input** — Choose a starting neighborhood or GPS, target distance, climbing preference, and route type
+- **Custom destination routing** — Specify any destination in SF or Marin and get a geocoded, bike-routed path
+- **Road-snapped map rendering** — Uses OSRM bike routing geometry on top of Leaflet and OpenStreetMap tiles
 - **Route summaries** — View distance, elevation gain, average climbing intensity, and estimated ride time
 - **Elevation preview** — Inline elevation chart for a quick read on ride difficulty
 - **Scenic context** — Route tags and scenic zones call out notable segments and landmarks
 - **GPX export** — Download a valid GPX file for Strava, Garmin Connect, Wahoo, and other compatible tools
-- **Strava connect stub** — Includes the client-side OAuth entry point for a future full integration
-- **Client-side geocoding** — Supports common SF and Marin neighborhoods via a built-in lookup table
+- **Client-side geocoding** — Supports SF and Marin neighborhoods via built-in lookup, with Mapbox fallback for addresses not in the local table
 
 ## How It Works
 
-1. Enter a starting location or use the GPS shortcut.
-2. Set distance, elevation preference, and route type.
-3. Routa selects a matching route template and offsets it from the user’s start point.
-4. The app requests road-following geometry from OSRM and renders the result in an embedded Leaflet map.
-5. The final route can be reviewed in overview, elevation, and scenic tabs, then exported as GPX.
+1. Describe your ride in plain English, or switch to the form and set your parameters manually.
+2. Routa parses your input — extracting start, destination, distance, elevation preference, and route type.
+3. If a destination is specified, it geocodes both points and builds a custom route via OSRM bike routing.
+4. If no destination is given, it selects the best-fit curated route for the requested distance and effort level.
+5. The route is rendered on an interactive Leaflet map with road-snapped geometry.
+6. Review the route in overview, elevation, and scenic tabs, then export as GPX.
 
 ## Getting started
 
@@ -47,22 +53,13 @@ Open http://localhost:5173
 - React 19 + Vite
 - Leaflet loaded inside an `iframe srcDoc`
 - OpenStreetMap / Public Domain Map tiles
-- OSRM-based route geometry fetch with browser-side fallback behavior
+- OSRM bike routing for road-snapped geometry
+- Mapbox geocoding fallback for address resolution
+- NLP parsing for natural language ride descriptions
 - GPX file generation via `Blob` and `URL.createObjectURL`
 - No backend required
 
 ## Current Scope
 
-- Geographic focus is limited to San Francisco and Marin
-- Route selection is based on three curated templates, not open-ended routing
-- Start-point geocoding uses a local lookup table rather than a live geocoding API
+- Geographic focus is SF and Marin County
 - Strava connect is present as a front-end flow, but full OAuth completion still requires real credentials and backend handling
-- Coffee stop support is previewed in the UI but not implemented yet
-
-## Roadmap
-
-- [ ] Expand beyond fixed route templates into more dynamic ride generation
-- [ ] Live geocoding (Mapbox / Google)
-- [ ] Coffee stop waypoints (Google Places API)
-- [ ] Strava OAuth with real credentials
-- [ ] Mobile-optimized layout
