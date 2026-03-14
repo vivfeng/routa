@@ -47,8 +47,16 @@ const SF_GEOCODES = {
   "the laundromat":       [37.7752, -122.4910],
   "laundromat":           [37.7752, -122.4910],
   "arsicault":            [37.7840, -122.4595],
-  "equator":              [37.8588, -122.4853],
+  // Equator Coffees locations
+  "equator":              [37.8588, -122.4853],  // Default to Sausalito
   "equator sausalito":    [37.8588, -122.4853],
+  "equator fort mason":   [37.8065, -122.4315],
+  "equator soma":         [37.7856, -122.4005],
+  "equator round house":  [37.8079, -122.4745],
+  "equator golden gate":  [37.8079, -122.4745],
+  "equator mill valley":  [37.9060, -122.5450],
+  "equator larkspur":     [37.9340, -122.5360],
+  "equator shoreline":    [37.8800, -122.5270],
   "flour craft":          [37.9058, -122.5468],
   "flour craft mill valley":[37.9058, -122.5468],
   "sunlife":              [37.9255, -122.5275],
