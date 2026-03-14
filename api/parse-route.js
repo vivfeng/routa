@@ -11,7 +11,7 @@ const KNOWN_LOCATIONS = [
   "equator mill valley", "equator larkspur", "equator shoreline", "flour craft",
   "flour craft mill valley", "sunlife", "sunlife corte madera", "sun life",
   "philz", "philz corte madera", "philz marina", "philz castro",
-  "philz mission", "philz noe valley", "philz russian hill",
+  "philz mission", "philz noe valley", "philz russian hill", "philz polk",
 ];
 
 const SYSTEM_PROMPT = `You extract cycling route parameters from natural language descriptions.
