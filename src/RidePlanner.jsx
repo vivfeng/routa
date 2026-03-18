@@ -1490,15 +1490,23 @@ function isMarin(latLng) { return latLng[0] >= 37.815; }
 
 // If route crosses SF↔Marin, inject GGB waypoint to avoid ferry
 function injectBridgeWaypoint(waypoints) {
+  console.log("[v0] injectBridgeWaypoint input:", JSON.stringify(waypoints));
   const result = [waypoints[0]];
   for (let i = 1; i < waypoints.length; i++) {
     const prev = waypoints[i - 1];
     const curr = waypoints[i];
-    if ((isSF(prev) && isMarin(curr)) || (isMarin(prev) && isSF(curr))) {
+    const prevIsSF = isSF(prev);
+    const prevIsMarin = isMarin(prev);
+    const currIsSF = isSF(curr);
+    const currIsMarin = isMarin(curr);
+    console.log("[v0] Checking segment", i, "prev:", prev, "isSF:", prevIsSF, "isMarin:", prevIsMarin, "curr:", curr, "isSF:", currIsSF, "isMarin:", currIsMarin);
+    if ((prevIsSF && currIsMarin) || (prevIsMarin && currIsSF)) {
+      console.log("[v0] Injecting GGB waypoint between segment", i-1, "and", i);
       result.push(GGB_WAYPOINT);
     }
     result.push(curr);
   }
+  console.log("[v0] injectBridgeWaypoint output:", JSON.stringify(result));
   return result;
 }
 
@@ -1605,7 +1613,8 @@ function useRouteGeometry(route) {
     const parsedWaypoints = parsedRoute.waypoints;
     const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
     const coordStr = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-
+    console.log("[v0] Routing waypoints:", routingWaypoints.length, "points, coordStr:", coordStr);
+    
     // Primary: Mapbox Cycling — prefers bike paths, avoids dead ends
     const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coordStr}?overview=full&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
     // Fallback: OSRM bike router
