@@ -1811,6 +1811,9 @@ export default function RidePlanner() {
   const [step, setStep] = useState(1);
   const [startAddress, setStartAddress] = useState("");
   const [useGPS, setUseGPS] = useState(false);
+  const [gpsCoords, setGpsCoords] = useState(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState(null);
   const [distance, setDistance] = useState(16);
   const [elevSlider, setElevSlider] = useState(1);
   const [preferLoop, setPreferLoop] = useState(true);
@@ -1993,7 +1996,7 @@ export default function RidePlanner() {
       }
 
       const latlng = useGPS
-        ? [37.7996, -122.4183]
+        ? (gpsCoords || [37.7996, -122.4183])
         : [confirmedAddress.lat, confirmedAddress.lng];
       generateRouteFromLatLng(latlng);
     } catch {
@@ -2449,17 +2452,61 @@ export default function RidePlanner() {
                     style={{ flex: 1, border: "1.5px solid", borderColor: startAddress ? "#111" : "#e5e5e5", borderRadius: 10, padding: "13px 16px", fontSize: 14, background: "#fff", outline: "none", transition: "border-color 0.15s", fontFamily: "inherit" }}
                   />
                   <button onClick={() => {
-                    setUseGPS(true);
-                    setStartAddress("Using your location");
+                    if (!navigator.geolocation) {
+                      setGpsError("Geolocation is not supported by your browser.");
+                      setRouteMessage("Geolocation is not supported by your browser.");
+                      return;
+                    }
+                    setGpsLoading(true);
+                    setGpsError(null);
                     setRouteMessage(null);
                     setPreferredRouteId(null);
                     setAddressCandidates([]);
                     setSelectedAddressIndex(0);
                     setConfirmedAddress(null);
+                    navigator.geolocation.getCurrentPosition(
+                      async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        setGpsCoords([latitude, longitude]);
+                        setUseGPS(true);
+                        // Show coords immediately while we reverse geocode
+                        setStartAddress(`Locating address… (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                        try {
+                          const features = await reverseGeocodeMapboxMidpoint(latitude, longitude);
+                          if (features.length > 0) {
+                            const name = extractMapboxFeatureName(features[0]);
+                            const neighborhood = extractMapboxNeighborhood(features[0]);
+                            const displayAddr = neighborhood && !name.includes(neighborhood)
+                              ? `${name}, ${neighborhood}`
+                              : name;
+                            setStartAddress(displayAddr || `Your location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                          } else {
+                            setStartAddress(`Your location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                          }
+                        } catch {
+                          setStartAddress(`Your location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                        }
+                        setGpsLoading(false);
+                      },
+                      (err) => {
+                        setGpsLoading(false);
+                        setGpsError(err.message);
+                        setUseGPS(false);
+                        if (err.code === 1) {
+                          setRouteMessage("Location permission denied. Please allow location access in your browser settings and try again.");
+                        } else if (err.code === 2) {
+                          setRouteMessage("Could not determine your location. Please try again or enter an address manually.");
+                        } else {
+                          setRouteMessage("Location request timed out. Please try again or enter an address manually.");
+                        }
+                      },
+                      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
                   }}
-                    style={{ border: "1.5px solid", borderColor: useGPS ? "#111" : "#e5e5e5", borderRadius: 10, padding: "0 15px", background: useGPS ? "#111" : "#fff", color: useGPS ? "#fff" : "#666", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", transition: "all 0.15s", fontFamily: "inherit" }}>
+                    disabled={gpsLoading}
+                    style={{ border: "1.5px solid", borderColor: useGPS ? "#111" : "#e5e5e5", borderRadius: 10, padding: "0 15px", background: useGPS ? "#111" : "#fff", color: useGPS ? "#fff" : "#666", cursor: gpsLoading ? "wait" : "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", transition: "all 0.15s", fontFamily: "inherit", opacity: gpsLoading ? 0.6 : 1 }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
-                    GPS
+                    {gpsLoading ? "Locating…" : "GPS"}
                   </button>
                 </div>
                 <p style={{ fontSize: 12, color: "#bbb", marginTop: 7 }}>e.g. "Russian Hill", "Ferry Building", "Marina"</p>
