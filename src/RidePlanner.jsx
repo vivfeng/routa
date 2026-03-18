@@ -40,7 +40,8 @@ const EXAMPLE_PROMPTS = [
 const PARADISE_LOOP_HALF_GEOMETRY = [[37.789300000000004,-122.45949000000002],[37.7918,-122.45882000000002],[37.792730000000006,-122.46110000000002],[37.79498,-122.46411],[37.79545,-122.46729],[37.79505,-122.46927000000001],[37.79437,-122.47239],[37.79395,-122.47579],[37.796820000000004,-122.477],[37.799200000000006,-122.47773000000001],[37.80219,-122.47678],[37.804410000000004,-122.47579],[37.805930000000004,-122.47584],[37.807880000000004,-122.47561],[37.80845,-122.47601000000002],[37.80848,-122.47705],[37.81407,-122.47804000000001],[37.82201333367601,-122.4789699908233],[37.828075000362695,-122.47967498998491],[37.83243,-122.48126],[37.834120000000006,-122.48413000000001],[37.83608,-122.48388000000001],[37.838660000000004,-122.48301000000001],[37.83984,-122.47921000000001],[37.841530000000006,-122.47764000000001],[37.84622,-122.47817],[37.848440000000004,-122.48077],[37.849880000000006,-122.47996],[37.855375000430264,-122.47922999844074],[37.858560000000004,-122.48344000000002],[37.86175,-122.49085000000001],[37.86372,-122.49738],[37.86929000000001,-122.50307000000001],[37.87268,-122.50560000000002],[37.878153353010205,-122.51304661806037],[37.88202000855602,-122.51806247945477],[37.88820500017211,-122.52472499906186],[37.895160000000004,-122.52590000000001],[37.899530000074286,-122.52660999840076],[37.90128,-122.52827],[37.90413,-122.52689000000001],[37.90596,-122.528],[37.90776,-122.52804],[37.91057,-122.52765000000001],[37.91189,-122.52754000000002],[37.91384,-122.52617000000001],[37.916360000000005,-122.52571],[37.91727,-122.5271],[37.91939,-122.52884000000002],[37.92034,-122.53006],[37.92183,-122.53014],[37.92289,-122.53095],[37.92454,-122.52912],[37.92638,-122.52971000000001],[37.92559,-122.52793000000001],[37.925380000000004,-122.52388],[37.92508,-122.51712],[37.927,-122.51139],[37.923880000000004,-122.51054],[37.920550000000006,-122.50992000000001],[37.91945000166232,-122.50587499981147],[37.91989,-122.49949000000001],[37.920356671820436,-122.49279999308479],[37.9204,-122.48797],[37.91857,-122.48395000000001],[37.91624,-122.48156000000002],[37.914820000000006,-122.47991],[37.91185,-122.47924],[37.909510000000004,-122.47860000000001],[37.90784,-122.47763],[37.906330000000004,-122.47996],[37.90476,-122.47853],[37.901880000000006,-122.48217000000001],[37.89887,-122.48734],[37.896980000000006,-122.49006000000001],[37.89576,-122.49164],[37.894280001476524,-122.49511499784688],[37.896930000000005,-122.49863],[37.898230000000005,-122.50138000000001],[37.89981,-122.50651],[37.90238,-122.51162000000001],[37.902950000000004,-122.51748],[37.904070000000004,-122.52273000000001],[37.901210000000006,-122.52675],[37.898099999925286,-122.52638999934494],[37.895760000144676,-122.52599999668733],[37.88873,-122.52486],[37.882940000000005,-122.51926000000002],[37.87933,-122.51457],[37.873180000000005,-122.50651],[37.869460000000004,-122.50327000000001],[37.86496000462077,-122.49895748559186],[37.86182500178142,-122.4931099996442],[37.86000000000001,-122.48673000000001],[37.85692,-122.48047000000001],[37.8530550000502,-122.47896500010057],[37.849450000000004,-122.48076],[37.84698000189796,-122.47982000026084],[37.84403500014341,-122.47810000159528],[37.84035,-122.47798000000002],[37.83966,-122.48215],[37.83672,-122.48314],[37.834540000000004,-122.4848],[37.83283,-122.48232000000002],[37.832010000000004,-122.48072],[37.82555,-122.47943000000001],[37.81877333332699,-122.47860333158022],[37.81392,-122.47803],[37.807790000000004,-122.47687],[37.80827,-122.47615],[37.807770000000005,-122.47546000000001],[37.8068,-122.47592000000002],[37.80566,-122.47598],[37.80434,-122.47579],[37.802760000000006,-122.47558000000001],[37.800050000000006,-122.47527000000001],[37.797560000000004,-122.47671000000001],[37.795590000000004,-122.47763],[37.794050001608746,-122.4742550024177],[37.79529,-122.46997],[37.795230000000004,-122.46814],[37.79616,-122.46527],[37.79314,-122.46159000000002],[37.79198,-122.45888000000001],[37.79026,-122.45869]];
 
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-const SF_MARIN_BBOX = [-122.55, 37.70, -122.34, 37.93];
+// Extended bounding box: SF to San Rafael/Novato area
+const SF_MARIN_BBOX = [-122.65, 37.70, -122.34, 38.05];
 
 // ── Geocoder ──────────────────────────────────────────────────────────────────
 const SF_GEOCODES = {
@@ -76,6 +77,18 @@ const SF_GEOCODES = {
   "crissy field": [37.8040, -122.4640],
   "fort mason":   [37.8060, -122.4310],
   "corte madera": [37.9255, -122.5275],
+  // San Rafael / North Marin
+  "san rafael":   [37.9735, -122.5311],
+  "downtown san rafael": [37.9735, -122.5311],
+  "san rafael downtown": [37.9735, -122.5311],
+  "terra linda":  [37.9612, -122.5398],
+  "san anselmo":  [37.9746, -122.5616],
+  "fairfax":      [37.9871, -122.5889],
+  "ross":         [37.9624, -122.5550],
+  "kentfield":    [37.9520, -122.5540],
+  "larkspur":     [37.9341, -122.5350],
+  "larkspur landing": [37.9460, -122.5100],
+  "novato":       [38.1074, -122.5697],
   // Cafés & bakeries
   "andytown ocean beach": [37.7648, -122.5088],
   "andytown outer sunset":[37.7567, -122.5022],
@@ -190,10 +203,10 @@ function looksLikeStreetAddress(addr) {
     for (const variation of variations) {
       try {
         const candidates = await searchFn(variation);
-        // Filter for SF/Marin addresses
+        // Filter for SF/Marin addresses (including San Rafael and North Marin)
         const validCandidates = candidates.filter(c => {
           const label = (c.label || '').toLowerCase();
-          return label.includes('san francisco') || label.includes('marin') || label.includes('sausalito') || label.includes('mill valley') || label.includes('tiburon');
+          return label.includes('san francisco') || label.includes('marin') || label.includes('sausalito') || label.includes('mill valley') || label.includes('tiburon') || label.includes('san rafael') || label.includes('larkspur') || label.includes('corte madera') || label.includes('san anselmo') || label.includes('fairfax') || label.includes('novato') || label.includes('kentfield') || label.includes('ross');
         });
         // Add unique candidates (dedupe by label)
         for (const candidate of validCandidates) {
@@ -655,7 +668,54 @@ async function searchNearbyMapboxStreetCandidates(addr) {
   return searchMapboxCandidates(streetQuery);
 }
 
-async function searchAddressCandidates(addr) {
+  // Broader POI search for destinations - uses Mapbox Search Box with expanded area
+  async function searchDestinationPOI(query) {
+    if (!MAPBOX_ACCESS_TOKEN || !query) return [];
+    
+    const sessionToken = buildSearchBoxSessionToken();
+    const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+    url.searchParams.set("q", query);
+    url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+    url.searchParams.set("session_token", sessionToken);
+    url.searchParams.set("country", "US");
+    url.searchParams.set("limit", "5");
+    // Expanded bbox for SF Bay Area including San Rafael, Novato, and surrounding areas
+    url.searchParams.set("bbox", "-122.75,37.65,-122.25,38.15");
+    url.searchParams.set("types", "poi,address,place");
+    
+    try {
+      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      
+      // Retrieve full details for each suggestion
+      const features = await Promise.all(
+        suggestions.slice(0, 3).map(async (suggestion) => {
+          if (!suggestion.mapbox_id) return null;
+          try {
+            const feature = await retrieveSearchBoxFeature(suggestion.mapbox_id, sessionToken);
+            if (!feature?.geometry?.coordinates) return null;
+            const [lng, lat] = feature.geometry.coordinates;
+            return {
+              lat,
+              lng,
+              label: feature.properties?.full_address || suggestion.name || query,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      
+      return features.filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async function searchAddressCandidates(addr) {
   if (!addr) return [];
   const normalizedAddress = normalizeAddressInput(addr);
   const exactAddressMode = looksLikeStreetAddress(normalizedAddress);
@@ -2185,19 +2245,29 @@ export default function RidePlanner() {
         try {
           let candidates = await searchAddressCandidates(parsed.startAddress);
           
-          // If no results and it looks like a street address, try variations
+          // Ensure we have city/state appended for street addresses
+          const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA") || parsed.startAddress.includes("Marin") || parsed.startAddress.includes("San Rafael")
+            ? parsed.startAddress
+            : `${parsed.startAddress}, San Francisco, CA`;
+          
+          // If no results and it looks like a street address, try with city appended
           if (candidates.length === 0 && looksLikeStreetAddress(parsed.startAddress)) {
-            // First try with SF appended if not already present
-            const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA")
-              ? parsed.startAddress
-              : `${parsed.startAddress}, San Francisco, CA`;
             candidates = await searchAddressCandidates(addressWithCity);
-            
-            // If still no results and no street suffix, try common suffix variations
-            if (candidates.length === 0 && !hasStreetSuffix(parsed.startAddress)) {
-              const suffixCandidates = await tryStreetSuffixVariations(addressWithCity, searchAddressCandidates);
-              if (suffixCandidates && suffixCandidates.length > 0) {
-                candidates = suffixCandidates;
+          }
+          
+          // For street addresses, ALWAYS check for suffix variations to ensure we catch ambiguous addresses
+          // (e.g., both "117 Mallorca Way" and "117 Mallorca Street" exist)
+          if (looksLikeStreetAddress(parsed.startAddress)) {
+            const suffixCandidates = await tryStreetSuffixVariations(addressWithCity, searchAddressCandidates);
+            if (suffixCandidates && suffixCandidates.length > 0) {
+              // Merge with existing candidates, deduping by label
+              const seenLabels = new Set(candidates.map(c => buildAddressKey(c.label)));
+              for (const sc of suffixCandidates) {
+                const key = buildAddressKey(sc.label);
+                if (!seenLabels.has(key)) {
+                  seenLabels.add(key);
+                  candidates.push(sc);
+                }
               }
             }
           }
@@ -2249,10 +2319,25 @@ export default function RidePlanner() {
         if (!destLl) {
           // Try Mapbox geocoding for destination
           try {
-            const candidates = await searchAddressCandidates(parsed.destination);
-            if (candidates.length > 0) destLl = [candidates[0].lat, candidates[0].lng];
-          } catch {
-            // ignore
+            let candidates = await searchAddressCandidates(parsed.destination);
+            console.log("[v0] Destination search for:", parsed.destination, "found:", candidates.length, "candidates");
+            
+            // If no results with original query, try with broader search (POI search)
+            if (candidates.length === 0) {
+              // Try searching without bbox restriction for POIs
+              const poiCandidates = await searchDestinationPOI(parsed.destination);
+              console.log("[v0] POI search found:", poiCandidates.length, "candidates");
+              if (poiCandidates.length > 0) {
+                candidates = poiCandidates;
+              }
+            }
+            
+            if (candidates.length > 0) {
+              destLl = [candidates[0].lat, candidates[0].lng];
+              console.log("[v0] Using destination coords:", destLl);
+            }
+          } catch (err) {
+            console.log("[v0] Destination search error:", err);
           }
         }
 
