@@ -20,25 +20,32 @@ The user is planning a bike ride in San Francisco / Marin County.
 Known starting locations and destinations: ${KNOWN_LOCATIONS.join(", ")}
 
 Return ONLY a JSON object (no markdown, no code fences) with these fields:
-- "startAddress": string — the starting neighborhood or address. Default "Russian Hill" if not specified.
+- "startAddress": string — the starting neighborhood or address. IMPORTANT: If the user provides a partial street address (e.g., "1600 harrison", "500 market st"), you MUST append ", San Francisco, CA" to make it a complete address. For known neighborhoods or landmarks, just use the name. Default "Russian Hill" if not specified.
 - "distance": number — ride distance in miles. Default 16 if not specified.
-- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy"/"fewest hills"/"least hills" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
+- "elevationPreference": number 0-4 — index into elevation presets: 0=Mostly Flat, 1=Moderate, 2=Rolling, 3=Hilly, 4=Very Hilly. Interpret "flat"/"easy"/"fewest hills"/"least hills"/"beginner" as 0, "not too hilly" as 1, "hilly" as 3, "very hilly" as 4. Default 1.
 - "preferLoop": boolean — true for loop, false for out-and-back or point-to-point. If a destination is mentioned, set false. Default true.
 - "destination": string or null — if the user wants to ride TO a specific place, put it here. Otherwise null.
 - "roundTrip": boolean — true ONLY if the user explicitly says "and back", "round trip", "out and back", or similar. If they just say "ride to X", this is false (one-way). Default false when destination is specified, true when no destination.
+- "areaHint": string or null — if the user mentions wanting to ride "around" or "through" an area (e.g., "around San Francisco", "through the park"), extract that area name here. Otherwise null.
 
 Examples:
 Input: "Flat 15-mile loop from the Marina"
-Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null,"roundTrip":true}
+Output: {"startAddress":"Marina","distance":15,"elevationPreference":0,"preferLoop":true,"destination":null,"roundTrip":true,"areaHint":null}
 
 Input: "Ride to Sausalito from Russian Hill, not too hilly"
-Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito","roundTrip":false}
+Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":1,"preferLoop":false,"destination":"sausalito","roundTrip":false,"areaHint":null}
 
 Input: "Go to Sam's Anchor Cafe from the Ferry Building with the least hills"
-Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor","roundTrip":false}
+Output: {"startAddress":"Ferry Building","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"sam's anchor","roundTrip":false,"areaHint":null}
 
 Input: "Ride to Equator in Sausalito and back, keep it flat"
-Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"equator sausalito","roundTrip":true}`;
+Output: {"startAddress":"Russian Hill","distance":16,"elevationPreference":0,"preferLoop":false,"destination":"equator sausalito","roundTrip":true,"areaHint":null}
+
+Input: "i want to go from 1600 harrison and go around san francisco, im a beginner"
+Output: {"startAddress":"1600 Harrison Street, San Francisco, CA","distance":16,"elevationPreference":0,"preferLoop":true,"destination":null,"roundTrip":true,"areaHint":"san francisco"}
+
+Input: "Start at 500 market st, easy 10 mile ride"
+Output: {"startAddress":"500 Market Street, San Francisco, CA","distance":10,"elevationPreference":0,"preferLoop":true,"destination":null,"roundTrip":true,"areaHint":null}`;
 
 function extractExplicitDistanceMiles(text) {
   if (!text || typeof text !== "string") return null;
