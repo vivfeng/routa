@@ -668,7 +668,54 @@ async function searchNearbyMapboxStreetCandidates(addr) {
   return searchMapboxCandidates(streetQuery);
 }
 
-async function searchAddressCandidates(addr) {
+  // Broader POI search for destinations - uses Mapbox Search Box with expanded area
+  async function searchDestinationPOI(query) {
+    if (!MAPBOX_ACCESS_TOKEN || !query) return [];
+    
+    const sessionToken = buildSearchBoxSessionToken();
+    const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+    url.searchParams.set("q", query);
+    url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+    url.searchParams.set("session_token", sessionToken);
+    url.searchParams.set("country", "US");
+    url.searchParams.set("limit", "5");
+    // Expanded bbox for SF Bay Area including San Rafael, Novato, and surrounding areas
+    url.searchParams.set("bbox", "-122.75,37.65,-122.25,38.15");
+    url.searchParams.set("types", "poi,address,place");
+    
+    try {
+      const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : [];
+      
+      // Retrieve full details for each suggestion
+      const features = await Promise.all(
+        suggestions.slice(0, 3).map(async (suggestion) => {
+          if (!suggestion.mapbox_id) return null;
+          try {
+            const feature = await retrieveSearchBoxFeature(suggestion.mapbox_id, sessionToken);
+            if (!feature?.geometry?.coordinates) return null;
+            const [lng, lat] = feature.geometry.coordinates;
+            return {
+              lat,
+              lng,
+              label: feature.properties?.full_address || suggestion.name || query,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      
+      return features.filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  async function searchAddressCandidates(addr) {
   if (!addr) return [];
   const normalizedAddress = normalizeAddressInput(addr);
   const exactAddressMode = looksLikeStreetAddress(normalizedAddress);
