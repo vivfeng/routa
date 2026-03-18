@@ -140,7 +140,68 @@ function isConfirmedAddressInput(addr, confirmedAddress) {
 
 function looksLikeStreetAddress(addr) {
   return /\b\d+\b/.test(addr);
-}
+  }
+  
+  // Common street suffix variations to try when geocoding fails
+  const STREET_SUFFIXES = ["Street", "St", "Avenue", "Ave", "Boulevard", "Blvd", "Road", "Rd", "Way", "Drive", "Dr", "Lane", "Ln", "Court", "Ct", "Place", "Pl", "Terrace", "Ter", "Circle", "Cir", "Parkway", "Pkwy", "Highway", "Hwy"];
+  
+  // Check if address already has a street suffix
+  function hasStreetSuffix(addr) {
+    const normalized = addr.toLowerCase();
+    return STREET_SUFFIXES.some(suffix => {
+      const suffixLower = suffix.toLowerCase();
+      // Check if the address ends with the suffix or has the suffix followed by a comma/space+city
+      return new RegExp(`\\b${suffixLower}\\b`, 'i').test(normalized);
+    });
+  }
+  
+  // Generate variations of an address with different street suffixes
+  function generateStreetSuffixVariations(addr) {
+    // Remove any existing suffix first
+    let baseAddr = addr;
+    for (const suffix of STREET_SUFFIXES) {
+      const regex = new RegExp(`\\s+${suffix}\\b`, 'gi');
+      baseAddr = baseAddr.replace(regex, '');
+    }
+    baseAddr = baseAddr.trim();
+    
+    // Extract city/state if present
+    const cityStateMatch = baseAddr.match(/,\s*(San Francisco|Marin|CA|California).*/i);
+    let streetPart = baseAddr;
+    let citySuffix = ', San Francisco, CA';
+    if (cityStateMatch) {
+      streetPart = baseAddr.slice(0, cityStateMatch.index).trim();
+      citySuffix = cityStateMatch[0];
+    }
+    
+    // Generate variations with common suffixes (prioritize most common)
+    const prioritySuffixes = ["Street", "Avenue", "Boulevard", "Way", "Road", "Drive", "Place"];
+    return prioritySuffixes.map(suffix => `${streetPart} ${suffix}${citySuffix}`);
+  }
+  
+  // Try to find a valid address by testing suffix variations
+  async function tryStreetSuffixVariations(addr, searchFn) {
+    if (!looksLikeStreetAddress(addr)) return null;
+    
+    const variations = generateStreetSuffixVariations(addr);
+    
+    for (const variation of variations) {
+      try {
+        const candidates = await searchFn(variation);
+        // Filter for SF/Marin addresses
+        const validCandidates = candidates.filter(c => {
+          const label = (c.label || '').toLowerCase();
+          return label.includes('san francisco') || label.includes('marin') || label.includes('sausalito') || label.includes('mill valley') || label.includes('tiburon');
+        });
+        if (validCandidates.length > 0) {
+          return validCandidates;
+        }
+      } catch {
+        // Continue to next variation
+      }
+    }
+    return null;
+  }
 
 function parseBusinessQuery(addr) {
   const normalized = normalizeAddressInput(addr);
@@ -2109,12 +2170,21 @@ export default function RidePlanner() {
         try {
           let candidates = await searchAddressCandidates(parsed.startAddress);
           
-          // If no results and it looks like a street address without city, try with SF appended
+          // If no results and it looks like a street address, try variations
           if (candidates.length === 0 && looksLikeStreetAddress(parsed.startAddress)) {
+            // First try with SF appended if not already present
             const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA")
               ? parsed.startAddress
               : `${parsed.startAddress}, San Francisco, CA`;
             candidates = await searchAddressCandidates(addressWithCity);
+            
+            // If still no results and no street suffix, try common suffix variations
+            if (candidates.length === 0 && !hasStreetSuffix(parsed.startAddress)) {
+              const suffixCandidates = await tryStreetSuffixVariations(addressWithCity, searchAddressCandidates);
+              if (suffixCandidates && suffixCandidates.length > 0) {
+                candidates = suffixCandidates;
+              }
+            }
           }
           
           if (candidates.length > 0) {
