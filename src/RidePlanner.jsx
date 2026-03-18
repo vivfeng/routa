@@ -2107,7 +2107,16 @@ export default function RidePlanner() {
       if (!startLl) {
         // Fall back to Mapbox geocoding
         try {
-          const candidates = await searchAddressCandidates(parsed.startAddress);
+          let candidates = await searchAddressCandidates(parsed.startAddress);
+          
+          // If no results and it looks like a street address without city, try with SF appended
+          if (candidates.length === 0 && looksLikeStreetAddress(parsed.startAddress)) {
+            const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA")
+              ? parsed.startAddress
+              : `${parsed.startAddress}, San Francisco, CA`;
+            candidates = await searchAddressCandidates(addressWithCity);
+          }
+          
           if (candidates.length > 0) {
             startLl = [candidates[0].lat, candidates[0].lng];
             setConfirmedAddress({ ...candidates[0], addressKey: buildAddressKey(candidates[0].label) });
