@@ -2198,19 +2198,29 @@ export default function RidePlanner() {
         try {
           let candidates = await searchAddressCandidates(parsed.startAddress);
           
-          // If no results and it looks like a street address, try variations
+          // Ensure we have city/state appended for street addresses
+          const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA") || parsed.startAddress.includes("Marin") || parsed.startAddress.includes("San Rafael")
+            ? parsed.startAddress
+            : `${parsed.startAddress}, San Francisco, CA`;
+          
+          // If no results and it looks like a street address, try with city appended
           if (candidates.length === 0 && looksLikeStreetAddress(parsed.startAddress)) {
-            // First try with SF appended if not already present
-            const addressWithCity = parsed.startAddress.includes("San Francisco") || parsed.startAddress.includes("CA")
-              ? parsed.startAddress
-              : `${parsed.startAddress}, San Francisco, CA`;
             candidates = await searchAddressCandidates(addressWithCity);
-            
-            // If still no results and no street suffix, try common suffix variations
-            if (candidates.length === 0 && !hasStreetSuffix(parsed.startAddress)) {
-              const suffixCandidates = await tryStreetSuffixVariations(addressWithCity, searchAddressCandidates);
-              if (suffixCandidates && suffixCandidates.length > 0) {
-                candidates = suffixCandidates;
+          }
+          
+          // For street addresses, ALWAYS check for suffix variations to ensure we catch ambiguous addresses
+          // (e.g., both "117 Mallorca Way" and "117 Mallorca Street" exist)
+          if (looksLikeStreetAddress(parsed.startAddress)) {
+            const suffixCandidates = await tryStreetSuffixVariations(addressWithCity, searchAddressCandidates);
+            if (suffixCandidates && suffixCandidates.length > 0) {
+              // Merge with existing candidates, deduping by label
+              const seenLabels = new Set(candidates.map(c => buildAddressKey(c.label)));
+              for (const sc of suffixCandidates) {
+                const key = buildAddressKey(sc.label);
+                if (!seenLabels.has(key)) {
+                  seenLabels.add(key);
+                  candidates.push(sc);
+                }
               }
             }
           }
