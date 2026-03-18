@@ -179,11 +179,13 @@ function looksLikeStreetAddress(addr) {
     return prioritySuffixes.map(suffix => `${streetPart} ${suffix}${citySuffix}`);
   }
   
-  // Try to find a valid address by testing suffix variations
+  // Try to find valid addresses by testing suffix variations - returns ALL matches from all variations
   async function tryStreetSuffixVariations(addr, searchFn) {
     if (!looksLikeStreetAddress(addr)) return null;
     
     const variations = generateStreetSuffixVariations(addr);
+    const allValidCandidates = [];
+    const seenLabels = new Set();
     
     for (const variation of variations) {
       try {
@@ -193,14 +195,19 @@ function looksLikeStreetAddress(addr) {
           const label = (c.label || '').toLowerCase();
           return label.includes('san francisco') || label.includes('marin') || label.includes('sausalito') || label.includes('mill valley') || label.includes('tiburon');
         });
-        if (validCandidates.length > 0) {
-          return validCandidates;
+        // Add unique candidates (dedupe by label)
+        for (const candidate of validCandidates) {
+          const normalizedLabel = buildAddressKey(candidate.label);
+          if (!seenLabels.has(normalizedLabel)) {
+            seenLabels.add(normalizedLabel);
+            allValidCandidates.push(candidate);
+          }
         }
       } catch {
         // Continue to next variation
       }
     }
-    return null;
+    return allValidCandidates.length > 0 ? allValidCandidates : null;
   }
 
 function parseBusinessQuery(addr) {
@@ -1902,6 +1909,11 @@ export default function RidePlanner() {
   const [nlParsing, setNlParsing] = useState(false);
   const [nlError, setNlError] = useState("");
   const [parsedIntent, setParsedIntent] = useState(null);
+  
+  // Address disambiguation state
+  const [addressOptions, setAddressOptions] = useState([]); // multiple address options to choose from
+  const [customAddressInput, setCustomAddressInput] = useState(""); // freeform input for custom address
+  const [pendingParsedIntent, setPendingParsedIntent] = useState(null); // store parsed intent while waiting for address selection
 
   const preset = ELEVATION_PRESETS[elevSlider];
   const ftColor = v => v <= 25 ? "#22c55e" : v <= 50 ? "#84cc16" : v <= 100 ? "#f59e0b" : "#ef4444";
@@ -2187,6 +2199,25 @@ export default function RidePlanner() {
             }
           }
           
+          // If we have multiple distinct address options, ask the user to choose
+          if (candidates.length > 1) {
+            // Check if addresses are meaningfully different (different street types, etc.)
+            const uniqueStreetTypes = new Set(candidates.map(c => {
+              const label = c.label.toLowerCase();
+              const streetMatch = label.match(/\b(street|st|avenue|ave|way|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|place|pl)\b/);
+              return streetMatch ? streetMatch[0] : 'unknown';
+            }));
+            
+            if (uniqueStreetTypes.size > 1) {
+              // Multiple distinct address types - ask user to choose
+              setAddressOptions(candidates.slice(0, 6)); // Limit to 6 options
+              setCustomAddressInput("");
+              setPendingParsedIntent(parsed);
+              setNlParsing(false);
+              return; // Wait for user selection
+            }
+          }
+          
           if (candidates.length > 0) {
             startLl = [candidates[0].lat, candidates[0].lng];
             setConfirmedAddress({ ...candidates[0], addressKey: buildAddressKey(candidates[0].label) });
@@ -2354,6 +2385,83 @@ export default function RidePlanner() {
     setTimeout(() => setExportSuccess(null), 3000);
   };
 
+  // Handle address selection from disambiguation options
+  const handleAddressOptionSelect = async (candidate) => {
+    setAddressOptions([]);
+    setCustomAddressInput("");
+    
+    const startLl = [candidate.lat, candidate.lng];
+    setConfirmedAddress({ ...candidate, addressKey: buildAddressKey(candidate.label) });
+    setStartAddress(candidate.label);
+    
+    if (pendingParsedIntent) {
+      const parsed = pendingParsedIntent;
+      setPendingParsedIntent(null);
+      
+      // Continue with route generation using the selected address
+      if (parsed.destination) {
+        // Handle destination routing (similar logic to handleNLGenerate)
+        const destKey = buildAddressKey(parsed.destination);
+        let destLl = SF_GEOCODES[destKey];
+        if (!destLl) {
+          const match = Object.keys(SF_GEOCODES).find(k => k.includes(destKey) || destKey.includes(k));
+          if (match) destLl = SF_GEOCODES[match];
+        }
+        if (!destLl) {
+          try {
+            const candidates = await searchAddressCandidates(parsed.destination);
+            if (candidates.length > 0) destLl = [candidates[0].lat, candidates[0].lng];
+          } catch { /* ignore */ }
+        }
+        if (destLl) {
+          // Generate destination-based route
+          generateRouteFromLatLng(startLl, {
+            distance: parsed.distance,
+            elevSlider: parsed.elevationPreference ?? 1,
+            preferLoop: false,
+          });
+          return;
+        }
+      }
+      // Generate loop route
+      generateRouteFromLatLng(startLl, {
+        distance: parsed.distance,
+        elevSlider: parsed.elevationPreference ?? 1,
+        preferLoop: parsed.preferLoop !== false,
+      });
+    }
+  };
+
+  // Handle custom address input from disambiguation
+  const handleCustomAddressSubmit = async () => {
+    if (!customAddressInput.trim()) return;
+    
+    setNlParsing(true);
+    try {
+      const candidates = await searchAddressCandidates(customAddressInput.trim());
+      if (candidates.length > 0) {
+        await handleAddressOptionSelect(candidates[0]);
+      } else {
+        setNlError(`Could not find "${customAddressInput}". Please try a different address.`);
+        setAddressOptions([]);
+        setPendingParsedIntent(null);
+      }
+    } catch {
+      setNlError("Error looking up address. Please try again.");
+      setAddressOptions([]);
+      setPendingParsedIntent(null);
+    } finally {
+      setNlParsing(false);
+    }
+  };
+
+  // Cancel address disambiguation
+  const handleAddressCancel = () => {
+    setAddressOptions([]);
+    setCustomAddressInput("");
+    setPendingParsedIntent(null);
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#fafaf8", fontFamily: "'DM Sans','Helvetica Neue',sans-serif", color: "#111" }}>
       <style>{`
@@ -2479,7 +2587,94 @@ export default function RidePlanner() {
                   </div>
                 )}
 
-                <button onClick={handleNLGenerate} disabled={!nlText.trim() || nlParsing}
+                {/* Address disambiguation picker */}
+                {addressOptions.length > 0 && (
+                  <div className="fade-in" style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 12, padding: "16px", fontSize: 13 }}>
+                    <div style={{ fontWeight: 600, color: "#0369a1", marginBottom: 12 }}>
+                      Which address did you mean?
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {addressOptions.map((option, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleAddressOptionSelect(option)}
+                          style={{
+                            textAlign: "left",
+                            padding: "10px 14px",
+                            borderRadius: 8,
+                            border: "1px solid #e0e0e0",
+                            background: "#fff",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            color: "#333",
+                            transition: "all 0.15s",
+                            fontFamily: "inherit",
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#0369a1"; }}
+                          onMouseOut={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#e0e0e0"; }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #e0f2fe" }}>
+                      <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>
+                        Or enter the full address:
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="text"
+                          value={customAddressInput}
+                          onChange={(e) => setCustomAddressInput(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleCustomAddressSubmit()}
+                          placeholder="e.g. 117 Mallorca Way, San Francisco, CA"
+                          style={{
+                            flex: 1,
+                            padding: "10px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #e0e0e0",
+                            fontSize: 13,
+                            outline: "none",
+                            fontFamily: "inherit",
+                          }}
+                        />
+                        <button
+                          onClick={handleCustomAddressSubmit}
+                          disabled={!customAddressInput.trim()}
+                          style={{
+                            padding: "10px 16px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: customAddressInput.trim() ? "#0369a1" : "#e5e5e5",
+                            color: customAddressInput.trim() ? "#fff" : "#999",
+                            cursor: customAddressInput.trim() ? "pointer" : "not-allowed",
+                            fontSize: 13,
+                            fontWeight: 500,
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Use this
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleAddressCancel}
+                      style={{
+                        marginTop: 12,
+                        fontSize: 12,
+                        color: "#64748b",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                <button onClick={handleNLGenerate} disabled={!nlText.trim() || nlParsing || addressOptions.length > 0}
                   style={{
                     width: "100%", padding: "15px", borderRadius: 12, fontSize: 14.5, fontWeight: 600,
                     border: "none", cursor: nlText.trim() && !nlParsing ? "pointer" : "not-allowed",
