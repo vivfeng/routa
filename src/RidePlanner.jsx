@@ -2272,10 +2272,25 @@ export default function RidePlanner() {
         if (!destLl) {
           // Try Mapbox geocoding for destination
           try {
-            const candidates = await searchAddressCandidates(parsed.destination);
-            if (candidates.length > 0) destLl = [candidates[0].lat, candidates[0].lng];
-          } catch {
-            // ignore
+            let candidates = await searchAddressCandidates(parsed.destination);
+            console.log("[v0] Destination search for:", parsed.destination, "found:", candidates.length, "candidates");
+            
+            // If no results with original query, try with broader search (POI search)
+            if (candidates.length === 0) {
+              // Try searching without bbox restriction for POIs
+              const poiCandidates = await searchDestinationPOI(parsed.destination);
+              console.log("[v0] POI search found:", poiCandidates.length, "candidates");
+              if (poiCandidates.length > 0) {
+                candidates = poiCandidates;
+              }
+            }
+            
+            if (candidates.length > 0) {
+              destLl = [candidates[0].lat, candidates[0].lng];
+              console.log("[v0] Using destination coords:", destLl);
+            }
+          } catch (err) {
+            console.log("[v0] Destination search error:", err);
           }
         }
 
