@@ -1488,7 +1488,7 @@ const GGB_WAYPOINT = [37.8199, -122.4783];
 function isSF(latLng) { return latLng[0] < 37.815; }
 function isMarin(latLng) { return latLng[0] >= 37.815; }
 
-// If route crosses SF↔Marin, inject GGB waypoint to avoid ferry
+// If route crosses SF↔Marin, inject GGB waypoint to avoid ferry/water
 function injectBridgeWaypoint(waypoints) {
   const result = [waypoints[0]];
   for (let i = 1; i < waypoints.length; i++) {
@@ -1557,12 +1557,14 @@ function useRouteGeometry(route) {
             };
           }
         } catch {
-          // Fall back to the straight connector below.
+          // Fall back to bridge-injected connector below.
         }
 
+        // For connectors crossing SF↔Marin, inject GGB waypoint to avoid drawing through water
+        const connectorCoords = injectBridgeWaypoint([from, to]);
         return {
-          coords: [from, to],
-          ...buildDirectConnectorStats([from, to]),
+          coords: connectorCoords,
+          ...buildDirectConnectorStats(connectorCoords),
         };
       };
 
@@ -1591,8 +1593,10 @@ function useRouteGeometry(route) {
         });
       }).catch(() => {
         if (cancelled) return;
-        setCoords(baseCoords);
-        const baseDistanceMeters = totalPathDistanceMeters(baseCoords, 0, baseCoords.length - 1);
+        // For cross-bay routes, inject bridge waypoints to avoid drawing through water
+        const fallbackCoords = injectBridgeWaypoint(baseCoords);
+        setCoords(fallbackCoords);
+        const baseDistanceMeters = totalPathDistanceMeters(fallbackCoords, 0, fallbackCoords.length - 1);
         setOsrmStats({
           distanceMi: Number((baseDistanceMeters / 1609.34).toFixed(1)),
           durationMin: Math.round((baseDistanceMeters / 1609.34) / 12 * 60),
@@ -1605,7 +1609,7 @@ function useRouteGeometry(route) {
     const parsedWaypoints = parsedRoute.waypoints;
     const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
     const coordStr = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-
+    
     // Primary: Mapbox Cycling — prefers bike paths, avoids dead ends
     const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coordStr}?overview=full&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
     // Fallback: OSRM bike router
@@ -1917,7 +1921,7 @@ ${trkpts}
 </gpx>`;
 }
 
-// ── Natural Language Input ────────────────────────────────────────────────────
+// ── Natural Language Input ──────────────────��─────────────────────────────────
 
 async function parseNaturalLanguage(text) {
   const response = await fetch("/api/parse-route", {
@@ -2001,9 +2005,9 @@ export default function RidePlanner() {
       })
       .catch(() => {
         if (cancelled) return;
-        setStravaAvailable(false);
-        setStravaConnected(false);
-        setStravaAthlete(null);
+        // fallback to bridge-injected waypoints (ensures route goes over GGB, not through water)
+        const fallbackCoords = injectBridgeWaypoint(parsedWaypoints);
+        setCoords(finalize(fallbackCoords));
       });
 
     return () => {
