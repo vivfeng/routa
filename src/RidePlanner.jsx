@@ -1488,25 +1488,17 @@ const GGB_WAYPOINT = [37.8199, -122.4783];
 function isSF(latLng) { return latLng[0] < 37.815; }
 function isMarin(latLng) { return latLng[0] >= 37.815; }
 
-// If route crosses SF↔Marin, inject GGB waypoint to avoid ferry
+// If route crosses SF↔Marin, inject GGB waypoint to avoid ferry/water
 function injectBridgeWaypoint(waypoints) {
-  console.log("[v0] injectBridgeWaypoint input:", JSON.stringify(waypoints));
   const result = [waypoints[0]];
   for (let i = 1; i < waypoints.length; i++) {
     const prev = waypoints[i - 1];
     const curr = waypoints[i];
-    const prevIsSF = isSF(prev);
-    const prevIsMarin = isMarin(prev);
-    const currIsSF = isSF(curr);
-    const currIsMarin = isMarin(curr);
-    console.log("[v0] Checking segment", i, "prev:", prev, "isSF:", prevIsSF, "isMarin:", prevIsMarin, "curr:", curr, "isSF:", currIsSF, "isMarin:", currIsMarin);
-    if ((prevIsSF && currIsMarin) || (prevIsMarin && currIsSF)) {
-      console.log("[v0] Injecting GGB waypoint between segment", i-1, "and", i);
+    if ((isSF(prev) && isMarin(curr)) || (isMarin(prev) && isSF(curr))) {
       result.push(GGB_WAYPOINT);
     }
     result.push(curr);
   }
-  console.log("[v0] injectBridgeWaypoint output:", JSON.stringify(result));
   return result;
 }
 
@@ -1565,12 +1557,14 @@ function useRouteGeometry(route) {
             };
           }
         } catch {
-          // Fall back to the straight connector below.
+          // Fall back to bridge-injected connector below.
         }
 
+        // For connectors crossing SF↔Marin, inject GGB waypoint to avoid drawing through water
+        const connectorCoords = injectBridgeWaypoint([from, to]);
         return {
-          coords: [from, to],
-          ...buildDirectConnectorStats([from, to]),
+          coords: connectorCoords,
+          ...buildDirectConnectorStats(connectorCoords),
         };
       };
 
@@ -1599,8 +1593,10 @@ function useRouteGeometry(route) {
         });
       }).catch(() => {
         if (cancelled) return;
-        setCoords(baseCoords);
-        const baseDistanceMeters = totalPathDistanceMeters(baseCoords, 0, baseCoords.length - 1);
+        // For cross-bay routes, inject bridge waypoints to avoid drawing through water
+        const fallbackCoords = injectBridgeWaypoint(baseCoords);
+        setCoords(fallbackCoords);
+        const baseDistanceMeters = totalPathDistanceMeters(fallbackCoords, 0, fallbackCoords.length - 1);
         setOsrmStats({
           distanceMi: Number((baseDistanceMeters / 1609.34).toFixed(1)),
           durationMin: Math.round((baseDistanceMeters / 1609.34) / 12 * 60),
@@ -1613,7 +1609,6 @@ function useRouteGeometry(route) {
     const parsedWaypoints = parsedRoute.waypoints;
     const routingWaypoints = injectBridgeWaypoint(parsedWaypoints);
     const coordStr = routingWaypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
-    console.log("[v0] Routing waypoints:", routingWaypoints.length, "points, coordStr:", coordStr);
     
     // Primary: Mapbox Cycling — prefers bike paths, avoids dead ends
     const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${coordStr}?overview=full&geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`;
@@ -1926,7 +1921,7 @@ ${trkpts}
 </gpx>`;
 }
 
-// ── Natural Language Input ────────────────────────────────────────────────────
+// ── Natural Language Input ──────────────────��─────────────────────────────────
 
 async function parseNaturalLanguage(text) {
   const response = await fetch("/api/parse-route", {
@@ -2010,9 +2005,9 @@ export default function RidePlanner() {
       })
       .catch(() => {
         if (cancelled) return;
-        setStravaAvailable(false);
-        setStravaConnected(false);
-        setStravaAthlete(null);
+        // fallback to bridge-injected waypoints (ensures route goes over GGB, not through water)
+        const fallbackCoords = injectBridgeWaypoint(parsedWaypoints);
+        setCoords(finalize(fallbackCoords));
       });
 
     return () => {
