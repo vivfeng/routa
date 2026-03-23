@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#ffffff"/>
+  <rect x="0" y="0" width="1200" height="4" fill="#f97316"/>
+
+  <!-- Logo -->
+  <text x="80" y="85" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="700" fill="#111" letter-spacing="1">Routa</text>
+  <circle cx="178" cy="78" r="5" fill="#f97316"/>
+
+  <!-- Subtitle -->
+  <text x="80" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#aaa" letter-spacing="3" font-weight="500">SF · MARIN RIDE PLANNER</text>
+
+  <!-- Main headline -->
+  <text x="80" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="700" fill="#111">Plan your ride.</text>
+
+  <!-- Features -->
+  <text x="80" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#888" font-weight="400">Curated routes · Elevation profiles · GPX export</text>
+
+  <!-- Divider -->
+  <line x1="80" y1="420" x2="1120" y2="420" stroke="#ebebeb" stroke-width="1"/>
+
+  <!-- Data sources -->
+  <text x="80" y="470" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#aaa" letter-spacing="2" font-weight="500">POWERED BY</text>
+  <text x="80" y="510" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#888" font-weight="400">OpenStreetMap · USGS Elevation Data · Mapbox · Strava</text>
+
+  <!-- Map illustration - simple road lines -->
+  <path d="M700 150 Q850 200 900 350 Q950 500 1100 520" stroke="#f97316" stroke-width="3" fill="none" opacity="0.3"/>
+  <path d="M750 100 Q900 180 950 300 Q1000 420 1120 450" stroke="#ebebeb" stroke-width="2" fill="none" opacity="0.5"/>
+  <circle cx="700" cy="150" r="6" fill="#f97316" opacity="0.5"/>
+  <circle cx="1100" cy="520" r="6" fill="#f97316" opacity="0.5"/>
+</svg>
