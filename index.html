@@ -4,25 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Plan cycling routes across San Francisco and Marin with curated rides, road-snapped maps, elevation profiles, and GPX export." />
+    <meta name="keywords" content="cycling route planner, San Francisco bike routes, Marin cycling, bike ride planner, GPX export, elevation profile, road cycling SF, bay area cycling routes" />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://routa.vercel.app/" />
+    <link rel="canonical" href="https://riderouta.org/" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Routa — SF · Marin Ride Planner" />
     <meta property="og:description" content="Plan cycling routes across San Francisco and Marin with curated rides, road-snapped maps, elevation profiles, and GPX export." />
-    <meta property="og:url" content="https://routa.vercel.app/" />
+    <meta property="og:url" content="https://riderouta.org/" />
+    <meta property="og:locale" content="en_US" />
+    <!-- TODO: Add og:image and twitter:image for social share previews -->
 
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Routa — SF · Marin Ride Planner" />
     <meta name="twitter:description" content="Plan cycling routes across San Francisco and Marin with curated rides, road-snapped maps, elevation profiles, and GPX export." />
 
     <title>Routa — SF · Marin Ride Planner</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='9.5' stroke='%23111' stroke-width='1.5' fill='none'/><path d='M8 13C8 9 12 7 16 12C19 16 15 18 12 18C9 18 8 16 8 13Z' fill='%23f97316'/></svg>" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Routa",
+      "url": "https://riderouta.org",
+      "description": "Plan cycling routes across San Francisco and Marin with curated rides, road-snapped maps, elevation profiles, and GPX export.",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <noscript><p>Routa is a cycling route planner for San Francisco and Marin County. Browse curated rides, view elevation profiles, and export GPX files for your next ride.</p></noscript>
   </body>
 </html>
