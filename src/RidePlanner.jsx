@@ -3232,6 +3232,56 @@ export default function RidePlanner() {
             </div>
           </div>
         )}
+
+        {/* FAQ + Sources — SEO content */}
+        {!route && (
+          <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 20px 80px" }}>
+            <div style={{ borderTop: "1px solid #ebebeb", paddingTop: 36 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", marginBottom: 20 }}>Frequently Asked Questions</div>
+              {[
+                ["What is Routa?", "Routa is a free cycling route planner built specifically for San Francisco and Marin County. It generates road-snapped routes with accurate elevation profiles, scenic zone information, and GPX export for Strava and Garmin devices. Whether you're planning a quick loop through Golden Gate Park or a century ride up to Stinson Beach, Routa helps you find the best route for your distance and elevation preferences."],
+                ["How does Routa plan routes?", "You enter a starting address (or choose from curated SF and Marin locations), set your desired distance and elevation preference, and choose between a loop or out-and-back route. Routa uses OpenStreetMap road data and Mapbox routing to generate a route that matches your criteria, snapped to real roads and bike paths. Elevation data comes from USGS National Map surveys and SF Open Data contour maps for accuracy."],
+                ["Is Routa free to use?", "Yes, Routa is completely free. No account required. Plan a route, view the elevation profile, and export your GPX file — all without signing up."],
+                ["What areas does Routa cover?", "Routa currently covers San Francisco and Marin County, including popular cycling destinations like the Golden Gate Bridge, Sausalito, Tiburon, Mill Valley, Paradise Loop, Hawk Hill, Stinson Beach, and routes through Golden Gate Park, the Presidio, and along the Embarcadero."],
+                ["Can I export routes to Strava or Garmin?", "Yes. Routa generates standard GPX files that you can download and import into Strava, Garmin Connect, Wahoo, Ride with GPS, or any other cycling app that supports GPX. You can also connect your Strava account directly to save routes without downloading a file."],
+                ["How accurate is the elevation data?", "Routa uses elevation data from two sources: USGS National Map (10-meter resolution digital elevation models covering the entire US) and SF Open Data contour maps (high-resolution contours specific to San Francisco). This combination provides accurate elevation profiles for route planning, though actual ride elevation may vary slightly based on GPS device and recording method."],
+                ["What are the curated routes?", "Routa includes pre-built example routes for popular SF and Marin rides: Paradise Loop from the Marina (a classic 38-mile Marin loop), a Golden Gate Park loop from Pacific Heights, and Hawk Hill from Russian Hill. These serve as starting points — you can modify the distance, elevation, and start point to customize any route."],
+              ].map(([q, a]) => (
+                <details key={q} style={{ borderBottom: "1px solid #ebebeb" }}>
+                  <summary style={{ cursor: "pointer", padding: "14px 0", fontSize: 15, fontWeight: 600, color: "#333", listStyle: "none", WebkitAppearance: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>{q}</span>
+                    <span style={{ fontSize: 12, color: "#ccc", flexShrink: 0, marginLeft: 12 }}>▼</span>
+                  </summary>
+                  <div style={{ paddingBottom: 16 }}>
+                    <p style={{ fontSize: 14, color: "#666", margin: 0, lineHeight: 1.75 }}>{a}</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+
+            <div style={{ borderTop: "1px solid #ebebeb", paddingTop: 36, marginTop: 36 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#aaa", marginBottom: 8 }}>Data Sources</div>
+              <p style={{ fontSize: 14, color: "#888", margin: "0 0 20px", lineHeight: 1.75 }}>
+                Routa combines data from multiple open and commercial sources to deliver accurate route planning for cyclists in the San Francisco Bay Area.
+              </p>
+              {[
+                ["OpenStreetMap", "https://www.openstreetmap.org/", "The primary source for road geometry, bike lane classifications, and path data. OpenStreetMap is a collaborative, open-source mapping project maintained by a global community of contributors. Road surface types, cycling infrastructure, and turn restrictions all come from OSM."],
+                ["USGS National Map", "https://www.usgs.gov/programs/national-geospatial-program/national-map", "Provides 10-meter resolution digital elevation models (DEMs) used for elevation profile calculation. The USGS National Map is the authoritative source for topographic data across the United States, maintained by the U.S. Geological Survey."],
+                ["SF Open Data", "https://datasf.org/opendata/", "High-resolution contour data specific to San Francisco, providing more detailed elevation information within city limits than USGS data alone. Published by the City and County of San Francisco."],
+                ["Mapbox", "https://www.mapbox.com/", "Powers the route matching engine that snaps planned routes to real roads, calculates turn-by-turn geometry, and provides geocoding for start address lookup. Mapbox processes the raw route plan into rideable, road-following GPS coordinates."],
+                ["Strava", "https://www.strava.com/", "Optional integration for exporting planned routes directly to your Strava account. Routes are saved as Strava routes that you can navigate using the Strava app or transfer to compatible bike computers."],
+              ].map(([name, url, desc]) => (
+                <div key={name} style={{ padding: "14px 0", borderTop: "1px solid #ebebeb" }}>
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 15, color: "#333", textDecoration: "none", fontWeight: 600 }}>
+                    {name} ↗
+                  </a>
+                  <p style={{ fontSize: 13, color: "#999", margin: "6px 0 0", lineHeight: 1.7 }}>{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
